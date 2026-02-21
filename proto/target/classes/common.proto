@@ -1,0 +1,12 @@
+syntax = "proto3";
+package cds.distdownloader.v1;
+
+option java_multiple_files = true;
+option java_package = "cds.distdownloader.proto";
+
+message PeerEndpoint {
+  string id = 1;      // UUID string
+  string ip = 2;      // e.g. "192.168.1.12"
+  uint32 port = 3;    // peer gRPC port (e.g., 6001)
+};
+

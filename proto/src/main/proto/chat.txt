@@ -1,0 +1,133 @@
+### What Tracker does
+
+* peers call `Announce()` every few seconds (heartbeat + bitmap)
+* clients call `GetPeers(file_id)` to discover who has chunks
+
+### `proto/src/main/proto/tracker.proto`
+
+```proto
+syntax = "proto3";
+
+package cds.distdownloader.v1;
+
+option java_multiple_files = true;
+option java_package = "cds.distdownloader.proto";
+
+import "google/protobuf/empty.proto";
+import "common.proto";
+
+message AnnounceRequest {
+  string file_id = 1;
+  PeerEndpoint endpoint = 2;
+
+  // Bitmap of chunks this peer currently has.
+  // Encoding: Java BitSet.toByteArray() (little-endian bit order).
+  bytes chunk_bitmap = 3;
+
+  // Optional but helpful for sanity/debugging
+  uint32 chunk_count = 4;
+}
+
+message PeerInfo {
+  PeerEndpoint endpoint = 1;
+  bytes chunk_bitmap = 2;
+  uint64 last_seen_unix_ms = 3;
+  uint32 chunk_count = 4;
+}
+
+message GetPeersRequest {
+  string file_id = 1;
+}
+
+message GetPeersResponse {
+  repeated PeerInfo peers = 1;
+}
+
+service Tracker {
+  rpc Announce(AnnounceRequest) returns (google.protobuf.Empty);
+  rpc GetPeers(GetPeersRequest) returns (GetPeersResponse);
+}
+```
+
+**Phase 0 implementation note:** Tracker can just store these structs in memory and update `last_seen_unix_ms` on each announce.
+
+---
+
+## `peer.proto` (peer-to-peer data plane)
+
+### What Peer does
+
+* serve chunks to other peers
+* later: support streaming transfers efficiently
+
+### `proto/src/main/proto/peer.proto`
+
+```proto
+syntax = "proto3";
+
+package cds.distdownloader.v1;
+
+option java_multiple_files = true;
+option java_package = "cds.distdownloader.proto";
+
+import "common.proto";
+
+message PingRequest {
+  string peer_id = 1;
+}
+
+message PingResponse {
+  string peer_id = 1;
+  uint64 unix_ms = 2;
+}
+
+message ChunkRequest {
+  string file_id = 1;
+  uint32 chunk_index = 2;
+}
+
+message ChunkResponse {
+  string file_id = 1;
+  uint32 chunk_index = 2;
+  bytes data = 3;      // raw chunk bytes
+}
+
+service Peer {
+  // Phase 0 sanity check
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  // Phase 2+ (you can stub it now, implement later)
+  rpc GetChunk(ChunkRequest) returns (ChunkResponse);
+
+  // Phase 4+ (optional): more efficient bulk transfer
+  rpc Download(stream ChunkRequest) returns (stream ChunkResponse);
+}
+```
+
+---
+
+## How the bitmap should work (so everyone agrees early)
+
+* The downloader knows `chunk_count` from the **manifest**.
+* Each peer reports which chunks it has as a bitmap:
+
+  * bit `i` = 1 means “I have chunk i verified on disk”
+* In Java:
+
+  * serialize: `byte[] b = bitSet.toByteArray();`
+  * parse: `BitSet bs = BitSet.valueOf(b);`
+
+This is great because it’s tiny and fast to send in Announce / GetPeers.
+
+---
+
+## If you don’t want `common.proto`
+
+You *can* duplicate `PeerEndpoint` in both files; it works, but you’ll generate duplicate classes and it’s slightly messier long-term. `common.proto` is worth it.
+
+---
+
+If you paste what you already have in `proto/` (or nothing yet), I can also give you:
+
+* the exact file paths you should use
+* the Maven `proto/pom.xml` codegen plugin block that generates these stubs cleanly for Java 21.

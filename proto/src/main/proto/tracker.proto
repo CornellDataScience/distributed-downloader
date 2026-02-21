@@ -1,0 +1,15 @@
+syntax = "proto3";
+package cds.distdownloader.v1;
+
+import "common.proto";
+
+message AllPeers {
+  repeated PeerEndpoint peers = 1;
+  int32 count = 2;
+}
+
+// peer can send message to tracker and receive acknowledgement; start tracking peer
+service Peer {
+  rpc SendMessage(PeerEndpoint) returns (AllPeers);
+}
+
