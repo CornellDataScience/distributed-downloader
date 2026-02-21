@@ -1,2 +1,3 @@
 Distributed Downloader
-- Naijei, [ADD NAMES]
+- Naijei
+- Tanvi
