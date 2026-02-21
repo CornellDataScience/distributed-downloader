@@ -1,3 +1,3 @@
 Distributed Downloader
-- Naijei
-- Tanvi
+
+Naijei, Harshaan, Tanvi
