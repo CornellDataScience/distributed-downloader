@@ -1,3 +1,3 @@
 Distributed Downloader
 
-Naijei, Harshaan, Tanvi
+Naijei Jiang, Harshaan Chugh, Tanvi Bhave, Sabrina Ning
