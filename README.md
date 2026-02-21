@@ -1,5 +1,3 @@
 Distributed Downloader
 
-Naijei
-
-Harshaan
+Naijei, Harshaan
