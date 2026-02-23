@@ -1,0 +1,8 @@
+{
+  "filename": "target.txt",
+  "filesize": "10",
+  "chunkSize": "1",
+  "chunkCount": "10",
+  "origin": "https://example.com/target.txt",
+  "hashAlgorithm": "SHA-256"
+}

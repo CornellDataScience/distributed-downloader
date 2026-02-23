@@ -1,0 +1,1 @@
+Manifest uses MiB as default unit (1 MiB = 1024 * 1024 bytes).
