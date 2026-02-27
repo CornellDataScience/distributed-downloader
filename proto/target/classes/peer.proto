@@ -6,6 +6,13 @@ option java_package = "cds.distdownloader.proto";
 import "common.proto";
 
 message Heartbeat {
+  // Sent on a timer so tracker knows this peer is still alive and reachable.
   PeerEndpoint endpoint = 1;
 }
 
+message ReportChunk {
+  // Sent right after a peer successfully downloads or obtains a chunk, so tracker
+  // can update which peers currently have that chunk.
+  PeerEndpoint endpoint = 1;
+  ChunkRef chunk = 2;
+}

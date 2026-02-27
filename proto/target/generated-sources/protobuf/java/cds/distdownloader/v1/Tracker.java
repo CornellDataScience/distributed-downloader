@@ -852,16 +852,23 @@ public final class Tracker {
   static {
     java.lang.String[] descriptorData = {
       "\n\rtracker.proto\022\025cds.distdownloader.v1\032\014" +
-      "common.proto\"M\n\010AllPeers\0222\n\005peers\030\001 \003(\0132" +
-      "#.cds.distdownloader.v1.PeerEndpoint\022\r\n\005" +
-      "count\030\002 \001(\0052[\n\004Peer\022S\n\013SendMessage\022#.cds" +
-      ".distdownloader.v1.PeerEndpoint\032\037.cds.di" +
-      "stdownloader.v1.AllPeersb\006proto3"
+      "common.proto\032\npeer.proto\"M\n\010AllPeers\0222\n\005" +
+      "peers\030\001 \003(\0132#.cds.distdownloader.v1.Peer" +
+      "Endpoint\022\r\n\005count\030\002 \001(\0052\270\002\n\004Peer\022K\n\010Regi" +
+      "ster\022#.cds.distdownloader.v1.PeerEndpoin" +
+      "t\032\032.cds.distdownloader.v1.Ack\022D\n\004Beat\022 ." +
+      "cds.distdownloader.v1.Heartbeat\032\032.cds.di" +
+      "stdownloader.v1.Ack\022H\n\006Report\022\".cds.dist" +
+      "downloader.v1.ReportChunk\032\032.cds.distdown" +
+      "loader.v1.Ack\022S\n\013SendMessage\022#.cds.distd" +
+      "ownloader.v1.PeerEndpoint\032\037.cds.distdown" +
+      "loader.v1.AllPeersb\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
         new com.google.protobuf.Descriptors.FileDescriptor[] {
           cds.distdownloader.proto.Common.getDescriptor(),
+          cds.distdownloader.proto.Peer.getDescriptor(),
         });
     internal_static_cds_distdownloader_v1_AllPeers_descriptor =
       getDescriptor().getMessageTypes().get(0);
@@ -871,6 +878,7 @@ public final class Tracker {
         new java.lang.String[] { "Peers", "Count", });
     descriptor.resolveAllFeaturesImmutable();
     cds.distdownloader.proto.Common.getDescriptor();
+    cds.distdownloader.proto.Peer.getDescriptor();
   }
 
   // @@protoc_insertion_point(outer_class_scope)

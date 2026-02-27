@@ -30,6 +30,16 @@ public final class Common {
   static final 
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_cds_distdownloader_v1_PeerEndpoint_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_cds_distdownloader_v1_ChunkRef_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_cds_distdownloader_v1_ChunkRef_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_cds_distdownloader_v1_Ack_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_cds_distdownloader_v1_Ack_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -41,8 +51,10 @@ public final class Common {
     java.lang.String[] descriptorData = {
       "\n\014common.proto\022\025cds.distdownloader.v1\"4\n" +
       "\014PeerEndpoint\022\n\n\002id\030\001 \001(\t\022\n\n\002ip\030\002 \001(\t\022\014\n" +
-      "\004port\030\003 \001(\rB\034\n\030cds.distdownloader.protoP" +
-      "\001b\006proto3"
+      "\004port\030\003 \001(\r\"0\n\010ChunkRef\022\017\n\007file_id\030\001 \001(\t" +
+      "\022\023\n\013chunk_index\030\002 \001(\r\"\"\n\003Ack\022\n\n\002ok\030\001 \001(\010" +
+      "\022\017\n\007message\030\002 \001(\tB\034\n\030cds.distdownloader." +
+      "protoP\001b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -54,6 +66,18 @@ public final class Common {
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_cds_distdownloader_v1_PeerEndpoint_descriptor,
         new java.lang.String[] { "Id", "Ip", "Port", });
+    internal_static_cds_distdownloader_v1_ChunkRef_descriptor =
+      getDescriptor().getMessageTypes().get(1);
+    internal_static_cds_distdownloader_v1_ChunkRef_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_cds_distdownloader_v1_ChunkRef_descriptor,
+        new java.lang.String[] { "FileId", "ChunkIndex", });
+    internal_static_cds_distdownloader_v1_Ack_descriptor =
+      getDescriptor().getMessageTypes().get(2);
+    internal_static_cds_distdownloader_v1_Ack_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_cds_distdownloader_v1_Ack_descriptor,
+        new java.lang.String[] { "Ok", "Message", });
     descriptor.resolveAllFeaturesImmutable();
   }
 

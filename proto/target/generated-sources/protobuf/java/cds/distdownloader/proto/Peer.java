@@ -30,16 +30,28 @@ public final class Peer {
       com.google.protobuf.MessageOrBuilder {
 
     /**
+     * <pre>
+     * Sent on a timer so tracker knows this peer is still alive and reachable.
+     * </pre>
+     *
      * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
      * @return Whether the endpoint field is set.
      */
     boolean hasEndpoint();
     /**
+     * <pre>
+     * Sent on a timer so tracker knows this peer is still alive and reachable.
+     * </pre>
+     *
      * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
      * @return The endpoint.
      */
     cds.distdownloader.proto.PeerEndpoint getEndpoint();
     /**
+     * <pre>
+     * Sent on a timer so tracker knows this peer is still alive and reachable.
+     * </pre>
+     *
      * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
      */
     cds.distdownloader.proto.PeerEndpointOrBuilder getEndpointOrBuilder();
@@ -85,6 +97,10 @@ public final class Peer {
     public static final int ENDPOINT_FIELD_NUMBER = 1;
     private cds.distdownloader.proto.PeerEndpoint endpoint_;
     /**
+     * <pre>
+     * Sent on a timer so tracker knows this peer is still alive and reachable.
+     * </pre>
+     *
      * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
      * @return Whether the endpoint field is set.
      */
@@ -93,6 +109,10 @@ public final class Peer {
       return ((bitField0_ & 0x00000001) != 0);
     }
     /**
+     * <pre>
+     * Sent on a timer so tracker knows this peer is still alive and reachable.
+     * </pre>
+     *
      * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
      * @return The endpoint.
      */
@@ -101,6 +121,10 @@ public final class Peer {
       return endpoint_ == null ? cds.distdownloader.proto.PeerEndpoint.getDefaultInstance() : endpoint_;
     }
     /**
+     * <pre>
+     * Sent on a timer so tracker knows this peer is still alive and reachable.
+     * </pre>
+     *
      * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
      */
     @java.lang.Override
@@ -427,6 +451,10 @@ public final class Peer {
       private com.google.protobuf.SingleFieldBuilder<
           cds.distdownloader.proto.PeerEndpoint, cds.distdownloader.proto.PeerEndpoint.Builder, cds.distdownloader.proto.PeerEndpointOrBuilder> endpointBuilder_;
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        * @return Whether the endpoint field is set.
        */
@@ -434,6 +462,10 @@ public final class Peer {
         return ((bitField0_ & 0x00000001) != 0);
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        * @return The endpoint.
        */
@@ -445,6 +477,10 @@ public final class Peer {
         }
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        */
       public Builder setEndpoint(cds.distdownloader.proto.PeerEndpoint value) {
@@ -461,6 +497,10 @@ public final class Peer {
         return this;
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        */
       public Builder setEndpoint(
@@ -475,6 +515,10 @@ public final class Peer {
         return this;
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        */
       public Builder mergeEndpoint(cds.distdownloader.proto.PeerEndpoint value) {
@@ -496,6 +540,10 @@ public final class Peer {
         return this;
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        */
       public Builder clearEndpoint() {
@@ -509,6 +557,10 @@ public final class Peer {
         return this;
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        */
       public cds.distdownloader.proto.PeerEndpoint.Builder getEndpointBuilder() {
@@ -517,6 +569,10 @@ public final class Peer {
         return getEndpointFieldBuilder().getBuilder();
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        */
       public cds.distdownloader.proto.PeerEndpointOrBuilder getEndpointOrBuilder() {
@@ -528,6 +584,10 @@ public final class Peer {
         }
       }
       /**
+       * <pre>
+       * Sent on a timer so tracker knows this peer is still alive and reachable.
+       * </pre>
+       *
        * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
        */
       private com.google.protobuf.SingleFieldBuilder<
@@ -595,11 +655,861 @@ public final class Peer {
 
   }
 
+  public interface ReportChunkOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:cds.distdownloader.v1.ReportChunk)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <pre>
+     * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+     * can update which peers currently have that chunk.
+     * </pre>
+     *
+     * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+     * @return Whether the endpoint field is set.
+     */
+    boolean hasEndpoint();
+    /**
+     * <pre>
+     * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+     * can update which peers currently have that chunk.
+     * </pre>
+     *
+     * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    cds.distdownloader.proto.PeerEndpoint getEndpoint();
+    /**
+     * <pre>
+     * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+     * can update which peers currently have that chunk.
+     * </pre>
+     *
+     * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+     */
+    cds.distdownloader.proto.PeerEndpointOrBuilder getEndpointOrBuilder();
+
+    /**
+     * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+     * @return Whether the chunk field is set.
+     */
+    boolean hasChunk();
+    /**
+     * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+     * @return The chunk.
+     */
+    cds.distdownloader.proto.ChunkRef getChunk();
+    /**
+     * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+     */
+    cds.distdownloader.proto.ChunkRefOrBuilder getChunkOrBuilder();
+  }
+  /**
+   * Protobuf type {@code cds.distdownloader.v1.ReportChunk}
+   */
+  public static final class ReportChunk extends
+      com.google.protobuf.GeneratedMessage implements
+      // @@protoc_insertion_point(message_implements:cds.distdownloader.v1.ReportChunk)
+      ReportChunkOrBuilder {
+  private static final long serialVersionUID = 0L;
+    static {
+      com.google.protobuf.RuntimeVersion.validateProtobufGencodeVersion(
+        com.google.protobuf.RuntimeVersion.RuntimeDomain.PUBLIC,
+        /* major= */ 4,
+        /* minor= */ 28,
+        /* patch= */ 2,
+        /* suffix= */ "",
+        ReportChunk.class.getName());
+    }
+    // Use ReportChunk.newBuilder() to construct.
+    private ReportChunk(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+    }
+    private ReportChunk() {
+    }
+
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return cds.distdownloader.proto.Peer.internal_static_cds_distdownloader_v1_ReportChunk_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return cds.distdownloader.proto.Peer.internal_static_cds_distdownloader_v1_ReportChunk_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              cds.distdownloader.proto.Peer.ReportChunk.class, cds.distdownloader.proto.Peer.ReportChunk.Builder.class);
+    }
+
+    private int bitField0_;
+    public static final int ENDPOINT_FIELD_NUMBER = 1;
+    private cds.distdownloader.proto.PeerEndpoint endpoint_;
+    /**
+     * <pre>
+     * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+     * can update which peers currently have that chunk.
+     * </pre>
+     *
+     * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+     * @return Whether the endpoint field is set.
+     */
+    @java.lang.Override
+    public boolean hasEndpoint() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+     * can update which peers currently have that chunk.
+     * </pre>
+     *
+     * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public cds.distdownloader.proto.PeerEndpoint getEndpoint() {
+      return endpoint_ == null ? cds.distdownloader.proto.PeerEndpoint.getDefaultInstance() : endpoint_;
+    }
+    /**
+     * <pre>
+     * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+     * can update which peers currently have that chunk.
+     * </pre>
+     *
+     * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+     */
+    @java.lang.Override
+    public cds.distdownloader.proto.PeerEndpointOrBuilder getEndpointOrBuilder() {
+      return endpoint_ == null ? cds.distdownloader.proto.PeerEndpoint.getDefaultInstance() : endpoint_;
+    }
+
+    public static final int CHUNK_FIELD_NUMBER = 2;
+    private cds.distdownloader.proto.ChunkRef chunk_;
+    /**
+     * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+     * @return Whether the chunk field is set.
+     */
+    @java.lang.Override
+    public boolean hasChunk() {
+      return ((bitField0_ & 0x00000002) != 0);
+    }
+    /**
+     * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+     * @return The chunk.
+     */
+    @java.lang.Override
+    public cds.distdownloader.proto.ChunkRef getChunk() {
+      return chunk_ == null ? cds.distdownloader.proto.ChunkRef.getDefaultInstance() : chunk_;
+    }
+    /**
+     * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+     */
+    @java.lang.Override
+    public cds.distdownloader.proto.ChunkRefOrBuilder getChunkOrBuilder() {
+      return chunk_ == null ? cds.distdownloader.proto.ChunkRef.getDefaultInstance() : chunk_;
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (((bitField0_ & 0x00000001) != 0)) {
+        output.writeMessage(1, getEndpoint());
+      }
+      if (((bitField0_ & 0x00000002) != 0)) {
+        output.writeMessage(2, getChunk());
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (((bitField0_ & 0x00000001) != 0)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, getEndpoint());
+      }
+      if (((bitField0_ & 0x00000002) != 0)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(2, getChunk());
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof cds.distdownloader.proto.Peer.ReportChunk)) {
+        return super.equals(obj);
+      }
+      cds.distdownloader.proto.Peer.ReportChunk other = (cds.distdownloader.proto.Peer.ReportChunk) obj;
+
+      if (hasEndpoint() != other.hasEndpoint()) return false;
+      if (hasEndpoint()) {
+        if (!getEndpoint()
+            .equals(other.getEndpoint())) return false;
+      }
+      if (hasChunk() != other.hasChunk()) return false;
+      if (hasChunk()) {
+        if (!getChunk()
+            .equals(other.getChunk())) return false;
+      }
+      if (!getUnknownFields().equals(other.getUnknownFields())) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (hasEndpoint()) {
+        hash = (37 * hash) + ENDPOINT_FIELD_NUMBER;
+        hash = (53 * hash) + getEndpoint().hashCode();
+      }
+      if (hasChunk()) {
+        hash = (37 * hash) + CHUNK_FIELD_NUMBER;
+        hash = (53 * hash) + getChunk().hashCode();
+      }
+      hash = (29 * hash) + getUnknownFields().hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    public static cds.distdownloader.proto.Peer.ReportChunk parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+
+    public static cds.distdownloader.proto.Peer.ReportChunk parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input);
+    }
+    public static cds.distdownloader.proto.Peer.ReportChunk parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessage
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(cds.distdownloader.proto.Peer.ReportChunk prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code cds.distdownloader.v1.ReportChunk}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:cds.distdownloader.v1.ReportChunk)
+        cds.distdownloader.proto.Peer.ReportChunkOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return cds.distdownloader.proto.Peer.internal_static_cds_distdownloader_v1_ReportChunk_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return cds.distdownloader.proto.Peer.internal_static_cds_distdownloader_v1_ReportChunk_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                cds.distdownloader.proto.Peer.ReportChunk.class, cds.distdownloader.proto.Peer.ReportChunk.Builder.class);
+      }
+
+      // Construct using cds.distdownloader.proto.Peer.ReportChunk.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage
+                .alwaysUseFieldBuilders) {
+          getEndpointFieldBuilder();
+          getChunkFieldBuilder();
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        bitField0_ = 0;
+        endpoint_ = null;
+        if (endpointBuilder_ != null) {
+          endpointBuilder_.dispose();
+          endpointBuilder_ = null;
+        }
+        chunk_ = null;
+        if (chunkBuilder_ != null) {
+          chunkBuilder_.dispose();
+          chunkBuilder_ = null;
+        }
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return cds.distdownloader.proto.Peer.internal_static_cds_distdownloader_v1_ReportChunk_descriptor;
+      }
+
+      @java.lang.Override
+      public cds.distdownloader.proto.Peer.ReportChunk getDefaultInstanceForType() {
+        return cds.distdownloader.proto.Peer.ReportChunk.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public cds.distdownloader.proto.Peer.ReportChunk build() {
+        cds.distdownloader.proto.Peer.ReportChunk result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public cds.distdownloader.proto.Peer.ReportChunk buildPartial() {
+        cds.distdownloader.proto.Peer.ReportChunk result = new cds.distdownloader.proto.Peer.ReportChunk(this);
+        if (bitField0_ != 0) { buildPartial0(result); }
+        onBuilt();
+        return result;
+      }
+
+      private void buildPartial0(cds.distdownloader.proto.Peer.ReportChunk result) {
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) != 0)) {
+          result.endpoint_ = endpointBuilder_ == null
+              ? endpoint_
+              : endpointBuilder_.build();
+          to_bitField0_ |= 0x00000001;
+        }
+        if (((from_bitField0_ & 0x00000002) != 0)) {
+          result.chunk_ = chunkBuilder_ == null
+              ? chunk_
+              : chunkBuilder_.build();
+          to_bitField0_ |= 0x00000002;
+        }
+        result.bitField0_ |= to_bitField0_;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof cds.distdownloader.proto.Peer.ReportChunk) {
+          return mergeFrom((cds.distdownloader.proto.Peer.ReportChunk)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(cds.distdownloader.proto.Peer.ReportChunk other) {
+        if (other == cds.distdownloader.proto.Peer.ReportChunk.getDefaultInstance()) return this;
+        if (other.hasEndpoint()) {
+          mergeEndpoint(other.getEndpoint());
+        }
+        if (other.hasChunk()) {
+          mergeChunk(other.getChunk());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        if (extensionRegistry == null) {
+          throw new java.lang.NullPointerException();
+        }
+        try {
+          boolean done = false;
+          while (!done) {
+            int tag = input.readTag();
+            switch (tag) {
+              case 0:
+                done = true;
+                break;
+              case 10: {
+                input.readMessage(
+                    getEndpointFieldBuilder().getBuilder(),
+                    extensionRegistry);
+                bitField0_ |= 0x00000001;
+                break;
+              } // case 10
+              case 18: {
+                input.readMessage(
+                    getChunkFieldBuilder().getBuilder(),
+                    extensionRegistry);
+                bitField0_ |= 0x00000002;
+                break;
+              } // case 18
+              default: {
+                if (!super.parseUnknownField(input, extensionRegistry, tag)) {
+                  done = true; // was an endgroup tag
+                }
+                break;
+              } // default:
+            } // switch (tag)
+          } // while (!done)
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.unwrapIOException();
+        } finally {
+          onChanged();
+        } // finally
+        return this;
+      }
+      private int bitField0_;
+
+      private cds.distdownloader.proto.PeerEndpoint endpoint_;
+      private com.google.protobuf.SingleFieldBuilder<
+          cds.distdownloader.proto.PeerEndpoint, cds.distdownloader.proto.PeerEndpoint.Builder, cds.distdownloader.proto.PeerEndpointOrBuilder> endpointBuilder_;
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       * @return Whether the endpoint field is set.
+       */
+      public boolean hasEndpoint() {
+        return ((bitField0_ & 0x00000001) != 0);
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       * @return The endpoint.
+       */
+      public cds.distdownloader.proto.PeerEndpoint getEndpoint() {
+        if (endpointBuilder_ == null) {
+          return endpoint_ == null ? cds.distdownloader.proto.PeerEndpoint.getDefaultInstance() : endpoint_;
+        } else {
+          return endpointBuilder_.getMessage();
+        }
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       */
+      public Builder setEndpoint(cds.distdownloader.proto.PeerEndpoint value) {
+        if (endpointBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          endpoint_ = value;
+        } else {
+          endpointBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       */
+      public Builder setEndpoint(
+          cds.distdownloader.proto.PeerEndpoint.Builder builderForValue) {
+        if (endpointBuilder_ == null) {
+          endpoint_ = builderForValue.build();
+        } else {
+          endpointBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       */
+      public Builder mergeEndpoint(cds.distdownloader.proto.PeerEndpoint value) {
+        if (endpointBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) != 0) &&
+            endpoint_ != null &&
+            endpoint_ != cds.distdownloader.proto.PeerEndpoint.getDefaultInstance()) {
+            getEndpointBuilder().mergeFrom(value);
+          } else {
+            endpoint_ = value;
+          }
+        } else {
+          endpointBuilder_.mergeFrom(value);
+        }
+        if (endpoint_ != null) {
+          bitField0_ |= 0x00000001;
+          onChanged();
+        }
+        return this;
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       */
+      public Builder clearEndpoint() {
+        bitField0_ = (bitField0_ & ~0x00000001);
+        endpoint_ = null;
+        if (endpointBuilder_ != null) {
+          endpointBuilder_.dispose();
+          endpointBuilder_ = null;
+        }
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       */
+      public cds.distdownloader.proto.PeerEndpoint.Builder getEndpointBuilder() {
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return getEndpointFieldBuilder().getBuilder();
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       */
+      public cds.distdownloader.proto.PeerEndpointOrBuilder getEndpointOrBuilder() {
+        if (endpointBuilder_ != null) {
+          return endpointBuilder_.getMessageOrBuilder();
+        } else {
+          return endpoint_ == null ?
+              cds.distdownloader.proto.PeerEndpoint.getDefaultInstance() : endpoint_;
+        }
+      }
+      /**
+       * <pre>
+       * Sent right after a peer successfully downloads or obtains a chunk, so tracker
+       * can update which peers currently have that chunk.
+       * </pre>
+       *
+       * <code>.cds.distdownloader.v1.PeerEndpoint endpoint = 1;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          cds.distdownloader.proto.PeerEndpoint, cds.distdownloader.proto.PeerEndpoint.Builder, cds.distdownloader.proto.PeerEndpointOrBuilder> 
+          getEndpointFieldBuilder() {
+        if (endpointBuilder_ == null) {
+          endpointBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              cds.distdownloader.proto.PeerEndpoint, cds.distdownloader.proto.PeerEndpoint.Builder, cds.distdownloader.proto.PeerEndpointOrBuilder>(
+                  getEndpoint(),
+                  getParentForChildren(),
+                  isClean());
+          endpoint_ = null;
+        }
+        return endpointBuilder_;
+      }
+
+      private cds.distdownloader.proto.ChunkRef chunk_;
+      private com.google.protobuf.SingleFieldBuilder<
+          cds.distdownloader.proto.ChunkRef, cds.distdownloader.proto.ChunkRef.Builder, cds.distdownloader.proto.ChunkRefOrBuilder> chunkBuilder_;
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       * @return Whether the chunk field is set.
+       */
+      public boolean hasChunk() {
+        return ((bitField0_ & 0x00000002) != 0);
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       * @return The chunk.
+       */
+      public cds.distdownloader.proto.ChunkRef getChunk() {
+        if (chunkBuilder_ == null) {
+          return chunk_ == null ? cds.distdownloader.proto.ChunkRef.getDefaultInstance() : chunk_;
+        } else {
+          return chunkBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       */
+      public Builder setChunk(cds.distdownloader.proto.ChunkRef value) {
+        if (chunkBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          chunk_ = value;
+        } else {
+          chunkBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       */
+      public Builder setChunk(
+          cds.distdownloader.proto.ChunkRef.Builder builderForValue) {
+        if (chunkBuilder_ == null) {
+          chunk_ = builderForValue.build();
+        } else {
+          chunkBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       */
+      public Builder mergeChunk(cds.distdownloader.proto.ChunkRef value) {
+        if (chunkBuilder_ == null) {
+          if (((bitField0_ & 0x00000002) != 0) &&
+            chunk_ != null &&
+            chunk_ != cds.distdownloader.proto.ChunkRef.getDefaultInstance()) {
+            getChunkBuilder().mergeFrom(value);
+          } else {
+            chunk_ = value;
+          }
+        } else {
+          chunkBuilder_.mergeFrom(value);
+        }
+        if (chunk_ != null) {
+          bitField0_ |= 0x00000002;
+          onChanged();
+        }
+        return this;
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       */
+      public Builder clearChunk() {
+        bitField0_ = (bitField0_ & ~0x00000002);
+        chunk_ = null;
+        if (chunkBuilder_ != null) {
+          chunkBuilder_.dispose();
+          chunkBuilder_ = null;
+        }
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       */
+      public cds.distdownloader.proto.ChunkRef.Builder getChunkBuilder() {
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return getChunkFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       */
+      public cds.distdownloader.proto.ChunkRefOrBuilder getChunkOrBuilder() {
+        if (chunkBuilder_ != null) {
+          return chunkBuilder_.getMessageOrBuilder();
+        } else {
+          return chunk_ == null ?
+              cds.distdownloader.proto.ChunkRef.getDefaultInstance() : chunk_;
+        }
+      }
+      /**
+       * <code>.cds.distdownloader.v1.ChunkRef chunk = 2;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          cds.distdownloader.proto.ChunkRef, cds.distdownloader.proto.ChunkRef.Builder, cds.distdownloader.proto.ChunkRefOrBuilder> 
+          getChunkFieldBuilder() {
+        if (chunkBuilder_ == null) {
+          chunkBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              cds.distdownloader.proto.ChunkRef, cds.distdownloader.proto.ChunkRef.Builder, cds.distdownloader.proto.ChunkRefOrBuilder>(
+                  getChunk(),
+                  getParentForChildren(),
+                  isClean());
+          chunk_ = null;
+        }
+        return chunkBuilder_;
+      }
+
+      // @@protoc_insertion_point(builder_scope:cds.distdownloader.v1.ReportChunk)
+    }
+
+    // @@protoc_insertion_point(class_scope:cds.distdownloader.v1.ReportChunk)
+    private static final cds.distdownloader.proto.Peer.ReportChunk DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new cds.distdownloader.proto.Peer.ReportChunk();
+    }
+
+    public static cds.distdownloader.proto.Peer.ReportChunk getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<ReportChunk>
+        PARSER = new com.google.protobuf.AbstractParser<ReportChunk>() {
+      @java.lang.Override
+      public ReportChunk parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        Builder builder = newBuilder();
+        try {
+          builder.mergeFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          throw e.setUnfinishedMessage(builder.buildPartial());
+        } catch (com.google.protobuf.UninitializedMessageException e) {
+          throw e.asInvalidProtocolBufferException().setUnfinishedMessage(builder.buildPartial());
+        } catch (java.io.IOException e) {
+          throw new com.google.protobuf.InvalidProtocolBufferException(e)
+              .setUnfinishedMessage(builder.buildPartial());
+        }
+        return builder.buildPartial();
+      }
+    };
+
+    public static com.google.protobuf.Parser<ReportChunk> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<ReportChunk> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public cds.distdownloader.proto.Peer.ReportChunk getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
   private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_cds_distdownloader_v1_Heartbeat_descriptor;
   private static final 
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_cds_distdownloader_v1_Heartbeat_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_cds_distdownloader_v1_ReportChunk_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_cds_distdownloader_v1_ReportChunk_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -611,8 +1521,11 @@ public final class Peer {
     java.lang.String[] descriptorData = {
       "\n\npeer.proto\022\025cds.distdownloader.v1\032\014com" +
       "mon.proto\"B\n\tHeartbeat\0225\n\010endpoint\030\001 \001(\013" +
-      "2#.cds.distdownloader.v1.PeerEndpointB\032\n" +
-      "\030cds.distdownloader.protob\006proto3"
+      "2#.cds.distdownloader.v1.PeerEndpoint\"t\n" +
+      "\013ReportChunk\0225\n\010endpoint\030\001 \001(\0132#.cds.dis" +
+      "tdownloader.v1.PeerEndpoint\022.\n\005chunk\030\002 \001" +
+      "(\0132\037.cds.distdownloader.v1.ChunkRefB\032\n\030c" +
+      "ds.distdownloader.protob\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -625,6 +1538,12 @@ public final class Peer {
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_cds_distdownloader_v1_Heartbeat_descriptor,
         new java.lang.String[] { "Endpoint", });
+    internal_static_cds_distdownloader_v1_ReportChunk_descriptor =
+      getDescriptor().getMessageTypes().get(1);
+    internal_static_cds_distdownloader_v1_ReportChunk_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+        internal_static_cds_distdownloader_v1_ReportChunk_descriptor,
+        new java.lang.String[] { "Endpoint", "Chunk", });
     descriptor.resolveAllFeaturesImmutable();
     cds.distdownloader.proto.Common.getDescriptor();
   }

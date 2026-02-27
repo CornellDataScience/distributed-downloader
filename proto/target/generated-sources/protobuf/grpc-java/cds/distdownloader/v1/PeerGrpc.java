@@ -19,6 +19,99 @@ public final class PeerGrpc {
 
   // Static method descriptors that strictly reflect the proto.
   private static volatile io.grpc.MethodDescriptor<cds.distdownloader.proto.PeerEndpoint,
+      cds.distdownloader.proto.Ack> getRegisterMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "Register",
+      requestType = cds.distdownloader.proto.PeerEndpoint.class,
+      responseType = cds.distdownloader.proto.Ack.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<cds.distdownloader.proto.PeerEndpoint,
+      cds.distdownloader.proto.Ack> getRegisterMethod() {
+    io.grpc.MethodDescriptor<cds.distdownloader.proto.PeerEndpoint, cds.distdownloader.proto.Ack> getRegisterMethod;
+    if ((getRegisterMethod = PeerGrpc.getRegisterMethod) == null) {
+      synchronized (PeerGrpc.class) {
+        if ((getRegisterMethod = PeerGrpc.getRegisterMethod) == null) {
+          PeerGrpc.getRegisterMethod = getRegisterMethod =
+              io.grpc.MethodDescriptor.<cds.distdownloader.proto.PeerEndpoint, cds.distdownloader.proto.Ack>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "Register"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  cds.distdownloader.proto.PeerEndpoint.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  cds.distdownloader.proto.Ack.getDefaultInstance()))
+              .setSchemaDescriptor(new PeerMethodDescriptorSupplier("Register"))
+              .build();
+        }
+      }
+    }
+    return getRegisterMethod;
+  }
+
+  private static volatile io.grpc.MethodDescriptor<cds.distdownloader.proto.Peer.Heartbeat,
+      cds.distdownloader.proto.Ack> getBeatMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "Beat",
+      requestType = cds.distdownloader.proto.Peer.Heartbeat.class,
+      responseType = cds.distdownloader.proto.Ack.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<cds.distdownloader.proto.Peer.Heartbeat,
+      cds.distdownloader.proto.Ack> getBeatMethod() {
+    io.grpc.MethodDescriptor<cds.distdownloader.proto.Peer.Heartbeat, cds.distdownloader.proto.Ack> getBeatMethod;
+    if ((getBeatMethod = PeerGrpc.getBeatMethod) == null) {
+      synchronized (PeerGrpc.class) {
+        if ((getBeatMethod = PeerGrpc.getBeatMethod) == null) {
+          PeerGrpc.getBeatMethod = getBeatMethod =
+              io.grpc.MethodDescriptor.<cds.distdownloader.proto.Peer.Heartbeat, cds.distdownloader.proto.Ack>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "Beat"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  cds.distdownloader.proto.Peer.Heartbeat.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  cds.distdownloader.proto.Ack.getDefaultInstance()))
+              .setSchemaDescriptor(new PeerMethodDescriptorSupplier("Beat"))
+              .build();
+        }
+      }
+    }
+    return getBeatMethod;
+  }
+
+  private static volatile io.grpc.MethodDescriptor<cds.distdownloader.proto.Peer.ReportChunk,
+      cds.distdownloader.proto.Ack> getReportMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "Report",
+      requestType = cds.distdownloader.proto.Peer.ReportChunk.class,
+      responseType = cds.distdownloader.proto.Ack.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<cds.distdownloader.proto.Peer.ReportChunk,
+      cds.distdownloader.proto.Ack> getReportMethod() {
+    io.grpc.MethodDescriptor<cds.distdownloader.proto.Peer.ReportChunk, cds.distdownloader.proto.Ack> getReportMethod;
+    if ((getReportMethod = PeerGrpc.getReportMethod) == null) {
+      synchronized (PeerGrpc.class) {
+        if ((getReportMethod = PeerGrpc.getReportMethod) == null) {
+          PeerGrpc.getReportMethod = getReportMethod =
+              io.grpc.MethodDescriptor.<cds.distdownloader.proto.Peer.ReportChunk, cds.distdownloader.proto.Ack>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(SERVICE_NAME, "Report"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  cds.distdownloader.proto.Peer.ReportChunk.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  cds.distdownloader.proto.Ack.getDefaultInstance()))
+              .setSchemaDescriptor(new PeerMethodDescriptorSupplier("Report"))
+              .build();
+        }
+      }
+    }
+    return getReportMethod;
+  }
+
+  private static volatile io.grpc.MethodDescriptor<cds.distdownloader.proto.PeerEndpoint,
       cds.distdownloader.v1.Tracker.AllPeers> getSendMessageMethod;
 
   @io.grpc.stub.annotations.RpcMethod(
@@ -101,6 +194,39 @@ public final class PeerGrpc {
   public interface AsyncService {
 
     /**
+     * <pre>
+     * Called once when a peer comes online so tracker can register it.
+     * </pre>
+     */
+    default void register(cds.distdownloader.proto.PeerEndpoint request,
+        io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getRegisterMethod(), responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Called periodically so that tracker keeps this peer marked alive.
+     * </pre>
+     */
+    default void beat(cds.distdownloader.proto.Peer.Heartbeat request,
+        io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getBeatMethod(), responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Called after a peer gets a chunk so tracker updates chunk ownership.
+     * </pre>
+     */
+    default void report(cds.distdownloader.proto.Peer.ReportChunk request,
+        io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack> responseObserver) {
+      io.grpc.stub.ServerCalls.asyncUnimplementedUnaryCall(getReportMethod(), responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Register peer and get current peer list in one round-trip.
+     * </pre>
      */
     default void sendMessage(cds.distdownloader.proto.PeerEndpoint request,
         io.grpc.stub.StreamObserver<cds.distdownloader.v1.Tracker.AllPeers> responseObserver) {
@@ -142,6 +268,42 @@ public final class PeerGrpc {
     }
 
     /**
+     * <pre>
+     * Called once when a peer comes online so tracker can register it.
+     * </pre>
+     */
+    public void register(cds.distdownloader.proto.PeerEndpoint request,
+        io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getRegisterMethod(), getCallOptions()), request, responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Called periodically so that tracker keeps this peer marked alive.
+     * </pre>
+     */
+    public void beat(cds.distdownloader.proto.Peer.Heartbeat request,
+        io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getBeatMethod(), getCallOptions()), request, responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Called after a peer gets a chunk so tracker updates chunk ownership.
+     * </pre>
+     */
+    public void report(cds.distdownloader.proto.Peer.ReportChunk request,
+        io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack> responseObserver) {
+      io.grpc.stub.ClientCalls.asyncUnaryCall(
+          getChannel().newCall(getReportMethod(), getCallOptions()), request, responseObserver);
+    }
+
+    /**
+     * <pre>
+     * Register peer and get current peer list in one round-trip.
+     * </pre>
      */
     public void sendMessage(cds.distdownloader.proto.PeerEndpoint request,
         io.grpc.stub.StreamObserver<cds.distdownloader.v1.Tracker.AllPeers> responseObserver) {
@@ -170,6 +332,39 @@ public final class PeerGrpc {
     }
 
     /**
+     * <pre>
+     * Called once when a peer comes online so tracker can register it.
+     * </pre>
+     */
+    public cds.distdownloader.proto.Ack register(cds.distdownloader.proto.PeerEndpoint request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getRegisterMethod(), getCallOptions(), request);
+    }
+
+    /**
+     * <pre>
+     * Called periodically so that tracker keeps this peer marked alive.
+     * </pre>
+     */
+    public cds.distdownloader.proto.Ack beat(cds.distdownloader.proto.Peer.Heartbeat request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getBeatMethod(), getCallOptions(), request);
+    }
+
+    /**
+     * <pre>
+     * Called after a peer gets a chunk so tracker updates chunk ownership.
+     * </pre>
+     */
+    public cds.distdownloader.proto.Ack report(cds.distdownloader.proto.Peer.ReportChunk request) {
+      return io.grpc.stub.ClientCalls.blockingUnaryCall(
+          getChannel(), getReportMethod(), getCallOptions(), request);
+    }
+
+    /**
+     * <pre>
+     * Register peer and get current peer list in one round-trip.
+     * </pre>
      */
     public cds.distdownloader.v1.Tracker.AllPeers sendMessage(cds.distdownloader.proto.PeerEndpoint request) {
       return io.grpc.stub.ClientCalls.blockingUnaryCall(
@@ -197,6 +392,42 @@ public final class PeerGrpc {
     }
 
     /**
+     * <pre>
+     * Called once when a peer comes online so tracker can register it.
+     * </pre>
+     */
+    public com.google.common.util.concurrent.ListenableFuture<cds.distdownloader.proto.Ack> register(
+        cds.distdownloader.proto.PeerEndpoint request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getRegisterMethod(), getCallOptions()), request);
+    }
+
+    /**
+     * <pre>
+     * Called periodically so that tracker keeps this peer marked alive.
+     * </pre>
+     */
+    public com.google.common.util.concurrent.ListenableFuture<cds.distdownloader.proto.Ack> beat(
+        cds.distdownloader.proto.Peer.Heartbeat request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getBeatMethod(), getCallOptions()), request);
+    }
+
+    /**
+     * <pre>
+     * Called after a peer gets a chunk so tracker updates chunk ownership.
+     * </pre>
+     */
+    public com.google.common.util.concurrent.ListenableFuture<cds.distdownloader.proto.Ack> report(
+        cds.distdownloader.proto.Peer.ReportChunk request) {
+      return io.grpc.stub.ClientCalls.futureUnaryCall(
+          getChannel().newCall(getReportMethod(), getCallOptions()), request);
+    }
+
+    /**
+     * <pre>
+     * Register peer and get current peer list in one round-trip.
+     * </pre>
      */
     public com.google.common.util.concurrent.ListenableFuture<cds.distdownloader.v1.Tracker.AllPeers> sendMessage(
         cds.distdownloader.proto.PeerEndpoint request) {
@@ -205,7 +436,10 @@ public final class PeerGrpc {
     }
   }
 
-  private static final int METHODID_SEND_MESSAGE = 0;
+  private static final int METHODID_REGISTER = 0;
+  private static final int METHODID_BEAT = 1;
+  private static final int METHODID_REPORT = 2;
+  private static final int METHODID_SEND_MESSAGE = 3;
 
   private static final class MethodHandlers<Req, Resp> implements
       io.grpc.stub.ServerCalls.UnaryMethod<Req, Resp>,
@@ -224,6 +458,18 @@ public final class PeerGrpc {
     @java.lang.SuppressWarnings("unchecked")
     public void invoke(Req request, io.grpc.stub.StreamObserver<Resp> responseObserver) {
       switch (methodId) {
+        case METHODID_REGISTER:
+          serviceImpl.register((cds.distdownloader.proto.PeerEndpoint) request,
+              (io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack>) responseObserver);
+          break;
+        case METHODID_BEAT:
+          serviceImpl.beat((cds.distdownloader.proto.Peer.Heartbeat) request,
+              (io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack>) responseObserver);
+          break;
+        case METHODID_REPORT:
+          serviceImpl.report((cds.distdownloader.proto.Peer.ReportChunk) request,
+              (io.grpc.stub.StreamObserver<cds.distdownloader.proto.Ack>) responseObserver);
+          break;
         case METHODID_SEND_MESSAGE:
           serviceImpl.sendMessage((cds.distdownloader.proto.PeerEndpoint) request,
               (io.grpc.stub.StreamObserver<cds.distdownloader.v1.Tracker.AllPeers>) responseObserver);
@@ -246,6 +492,27 @@ public final class PeerGrpc {
 
   public static final io.grpc.ServerServiceDefinition bindService(AsyncService service) {
     return io.grpc.ServerServiceDefinition.builder(getServiceDescriptor())
+        .addMethod(
+          getRegisterMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              cds.distdownloader.proto.PeerEndpoint,
+              cds.distdownloader.proto.Ack>(
+                service, METHODID_REGISTER)))
+        .addMethod(
+          getBeatMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              cds.distdownloader.proto.Peer.Heartbeat,
+              cds.distdownloader.proto.Ack>(
+                service, METHODID_BEAT)))
+        .addMethod(
+          getReportMethod(),
+          io.grpc.stub.ServerCalls.asyncUnaryCall(
+            new MethodHandlers<
+              cds.distdownloader.proto.Peer.ReportChunk,
+              cds.distdownloader.proto.Ack>(
+                service, METHODID_REPORT)))
         .addMethod(
           getSendMessageMethod(),
           io.grpc.stub.ServerCalls.asyncUnaryCall(
@@ -301,6 +568,9 @@ public final class PeerGrpc {
         if (result == null) {
           serviceDescriptor = result = io.grpc.ServiceDescriptor.newBuilder(SERVICE_NAME)
               .setSchemaDescriptor(new PeerFileDescriptorSupplier())
+              .addMethod(getRegisterMethod())
+              .addMethod(getBeatMethod())
+              .addMethod(getReportMethod())
               .addMethod(getSendMessageMethod())
               .build();
         }
