@@ -34,9 +34,9 @@ When multiple machines on the same LAN need the same file, peers can share chunk
 - Protobuf package: `cds.distdownloader.v1`
 - Generated Java package: `cds.distdownloader.proto`
 - Generated classes and stubs come from:
-  - `common.proto`
-  - `tracker.proto`
-  - `peer.proto`
+    - `common.proto`
+    - `tracker.proto`
+    - `peer.proto`
 
 ## Prerequisites
 
@@ -95,3 +95,5 @@ After building `proto`:
 - Harshaan Chugh
 - Tanvi Bhave
 - Sabrina Ning
+- Skai Nzeuton
+- Rahi Dasgupta
