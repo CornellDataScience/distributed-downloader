@@ -12,8 +12,8 @@ message FileRequest {
 
 message ChunkBitmap {
   string file_id = 1;
-  uint32 num_chunks = 2;
-  bytes bitset = 3; // bit i = have chunk i
+  uint32 num_chunks = 2; //0
+  bytes bitset = 3; // bit i = have chunk i //0
 }
 
 message ChunkRequest {

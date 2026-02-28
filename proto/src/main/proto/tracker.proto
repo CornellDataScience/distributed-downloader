@@ -6,14 +6,6 @@ import "common.proto";
 option java_multiple_files = true;
 option java_package = "cds.distdownloader.proto";
 
-// Peer comes online once. Tracker records/refreshes last-seen.
-message RegisterRequest {
-  PeerEndpoint endpoint = 1;
-}
-message RegisterResponse {
-  Ack ack = 1;
-}
-
 // Peer sends this periodically (ex: every 5s).
 message HeartbeatRequest {
   PeerEndpoint endpoint = 1;
@@ -23,13 +15,14 @@ message HeartbeatResponse {
 }
 
 // Returns only currently-up peers (not expired by TTL).
-message ListPeersRequest {}
+message ListPeersRequest {
+  // empty: client sends request, tracker doesn't do anything
+}
 message ListPeersResponse {
   repeated PeerEndpoint up_peers = 1;
 }
 
 service Tracker {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
 }
