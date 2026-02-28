@@ -2,24 +2,34 @@ syntax = "proto3";
 package cds.distdownloader.v1;
 
 import "common.proto";
-import "peer.proto";
 
-message AllPeers {
-  repeated PeerEndpoint peers = 1;
-  int32 count = 2;
+option java_multiple_files = true;
+option java_package = "cds.distdownloader.proto";
+
+// Peer comes online once. Tracker records/refreshes last-seen.
+message RegisterRequest {
+  PeerEndpoint endpoint = 1;
+}
+message RegisterResponse {
+  Ack ack = 1;
 }
 
-// peer can send message to tracker and receive acknowledgement; start tracking peer
-service Peer {
-  // Called once when a peer comes online so tracker can register it.
-  rpc Register(PeerEndpoint) returns (Ack);
+// Peer sends this periodically (ex: every 5s).
+message HeartbeatRequest {
+  PeerEndpoint endpoint = 1;
+}
+message HeartbeatResponse {
+  Ack ack = 1;
+}
 
-  // Called periodically so that tracker keeps this peer marked alive.
-  rpc Beat(Heartbeat) returns (Ack);
+// Returns only currently-up peers (not expired by TTL).
+message ListPeersRequest {}
+message ListPeersResponse {
+  repeated PeerEndpoint up_peers = 1;
+}
 
-  // Called after a peer gets a chunk so tracker updates chunk ownership.
-  rpc Report(ReportChunk) returns (Ack);
-
-  // Register peer and get current peer list in one round-trip.
-  rpc SendMessage(PeerEndpoint) returns (AllPeers);
+service Tracker {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
 }

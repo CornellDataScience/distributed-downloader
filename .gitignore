@@ -1,0 +1,6 @@
+# Maven build output
+**/target/
+
+# IDE / OS noise
+.idea/
+.DS_Store

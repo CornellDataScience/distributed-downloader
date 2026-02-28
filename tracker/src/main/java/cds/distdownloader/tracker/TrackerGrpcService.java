@@ -1,34 +1,28 @@
 package cds.distdownloader.tracker;
 
-import cds.distdownloader.proto.Ack;
-import cds.distdownloader.proto.PeerEndpoint;
-import cds.distdownloader.proto.Peer;
-import cds.distdownloader.v1.PeerGrpc;
-import cds.distdownloader.v1.Tracker.AllPeers;
+import cds.distdownloader.proto.*;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.springframework.stereotype.Service;
 
 @Service
-public class TrackerGrpcService extends PeerGrpc.PeerImplBase {
+public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
 
     @Override
-    public void register(PeerEndpoint request, StreamObserver<Ack> responseObserver) {
+    public void register(RegisterRequest request,
+            StreamObserver<RegisterResponse> responseObserver) {
         responseObserver.onError(Status.UNIMPLEMENTED.asRuntimeException());
     }
 
     @Override
-    public void beat(Peer.Heartbeat request, StreamObserver<Ack> responseObserver) {
+    public void heartbeat(HeartbeatRequest request,
+            StreamObserver<HeartbeatResponse> responseObserver) {
         responseObserver.onError(Status.UNIMPLEMENTED.asRuntimeException());
     }
 
     @Override
-    public void report(Peer.ReportChunk request, StreamObserver<Ack> responseObserver) {
-        responseObserver.onError(Status.UNIMPLEMENTED.asRuntimeException());
-    }
-
-    @Override
-    public void sendMessage(PeerEndpoint request, StreamObserver<AllPeers> responseObserver) {
+    public void listPeers(ListPeersRequest request,
+            StreamObserver<ListPeersResponse> responseObserver) {
         responseObserver.onError(Status.UNIMPLEMENTED.asRuntimeException());
     }
 }
