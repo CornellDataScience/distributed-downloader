@@ -69,7 +69,22 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
         ChunkRef chunk = request.getChunk();
         String file = chunk.getFileId();
         Integer index = chunk.getChunkIndex();
-        ByteString chunkBytes = fileToChunk.get(file).get(index);
+        Map<Integer, ByteString> chunkMap = fileToChunk.get(file);
+        if (chunkMap == null) {
+            responseObserver.onError(Status.NOT_FOUND
+                    .withDescription("No chunks tracked for file_id=" + file)
+                    .asRuntimeException());
+            return;
+        }
+
+        ByteString chunkBytes = chunkMap.get(index);
+        if (chunkBytes == null) {
+            responseObserver.onError(Status.NOT_FOUND
+                    .withDescription("Chunk not found for file_id=" + file + ", chunk_index=" + index)
+                    .asRuntimeException());
+            return;
+        }
+
         ChunkResponse resp = ChunkResponse.newBuilder()
                 .setData(chunkBytes)
                 .build();
