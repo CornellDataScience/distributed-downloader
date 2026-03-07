@@ -1,7 +1,6 @@
 package cds.distdownloader.tracker;
 
 import cds.distdownloader.proto.*;
-import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.HashSet;
 import org.springframework.stereotype.Service;
@@ -14,31 +13,30 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
 
     // https://www.geeksforgeeks.org/java/java-time-instant-class-in-java/
     // who is alive; peer -> last seen
-    private Map<String, PeerEndpoint> peerToEndpoint = new HashMap<>();
-    private Map<PeerEndpoint, Instant> peerMap = new HashMap<>();
-    private Map<String, Set<String>> peerToFiles = new HashMap<>();
-    private Map<String, Set<String>> fileToPeers = new HashMap<>();
+    private final Map<String, PeerEndpoint> peerToEndpoint = new HashMap<>();
+    private final Map<PeerEndpoint, Instant> peerMap = new HashMap<>();
+    private final Map<String, Set<String>> peerToFiles = new HashMap<>();
+    private final Map<String, Set<String>> fileToPeers = new HashMap<>();
 
     //Peer will send a heart beat to tracker(5s) , if no heart beat is seen in the last 10 second delete them
     @Override
-    public synchronized void heartbeat(HeartbeatRequest request,
+    public synchronized void handleHeartbeatRequest(HeartbeatRequest request,
             StreamObserver<HeartbeatResponse> responseObserver) {
         PeerEndpoint peerEndPoint = request.getEndpoint();
         peerMap.put(peerEndPoint, Instant.now());
 
-        String peer_id = peerEndPoint.getId();
-        Set<String> file_ids = new HashSet<String>(request.getFileIdsList());
+        String peerId = peerEndPoint.getId();
+        Set<String> fileIds = new HashSet<>(request.getFileIdsList());
 
         // add peer to peerToEndpoint
-        peerToEndpoint.put(peer_id, peerEndPoint);
+        peerToEndpoint.put(peerId, peerEndPoint);
 
         // add files to peerToFiles
-        peerToFiles.put(peer_id, file_ids);
+        peerToFiles.put(peerId, fileIds);
 
         // add peer to fileToPeers
-        for (String file_id : file_ids) {
-            Set<String> filePeers = fileToPeers.getOrDefault(file_id, new HashSet<String>());
-            filePeers.add(peer_id);
+        for (String fileId : fileIds) {
+            fileToPeers.putIfAbsent(fileId, new HashSet<>(Set.of(peerId)));
         }
 
         HeartbeatResponse resp = HeartbeatResponse.newBuilder()
@@ -48,12 +46,12 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
     }
 
     @Override
-    /**
-     * Loop through all peers in the map, and delete all that were 10+ seconds
-     * from the current instant.
-     * Then, we will send out a list version of the keySet
+    /*
+      Loop through all peers in the map, and delete all that were 10+ seconds
+      from the current instant.
+      Then, we will send out a list version of the keySet
      */
-    public synchronized void listPeers(ListPeersRequest request,
+    public synchronized void handleListPeersRequest(ListPeersRequest request,
             StreamObserver<ListPeersResponse> responseObserver) {
         Set<PeerEndpoint> peers = new HashSet<>(peerMap.keySet());
 
@@ -72,14 +70,15 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
         responseObserver.onCompleted();
     }
 
-    private synchronized List<String> GetPeersByFile(String fileId) {
-        List<String> peers = new ArrayList<String>();
+    private synchronized List<String> getPeersByFile(String fileId) {
+        List<String> peers = new ArrayList<>();
 
         Instant timeNow = Instant.now();
         Instant cutoff = timeNow.minusSeconds(10);
-        for (String peerId : fileToPeers.get(fileId)) {
+        for (String peerId : fileToPeers.getOrDefault(fileId, Collections.emptySet())) {
             PeerEndpoint endpoint = peerToEndpoint.get(peerId);
-            if (peerMap.get(endpoint).isBefore(cutoff)) {
+            Instant lastSeen = peerMap.get(endpoint);
+            if (lastSeen != null && !lastSeen.isBefore(cutoff)) {
                 peers.add(peerId);
             }
         }

@@ -24,6 +24,6 @@ message ListPeersResponse {
 }
 
 service Tracker {
-  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
-  rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
+  rpc handleHeartbeatRequest(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc handleListPeersRequest(ListPeersRequest) returns (ListPeersResponse);
 }
