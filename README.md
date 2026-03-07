@@ -15,7 +15,7 @@ When multiple machines on the same LAN need the same file, peers can share chunk
 - Serves chunk availability and chunk bytes
 - RPCs: `GetAvailability(file_id)`, `GetChunk(file_id, chunk_index)`
 
-3. **Client** (planned/next)
+3. **Client** (in progress)
 - Loads manifest
 - Asks tracker for live peers
 - Fetches availability bitmap from peers
@@ -76,7 +76,7 @@ mvn -pl tracker spring-boot:run
 mvn -pl peer spring-boot:run
 ```
 
-Shortcuts from repo root:
+Also at repo root, leverage MakeFile:
 
 ```bash
 # Run tracker
@@ -84,6 +84,12 @@ make t
 
 # Run peer
 make p
+
+# Run client
+make c
+
+# Recompile proto files
+make pr
 ```
 
 ## Generated gRPC Output
@@ -101,8 +107,8 @@ After building `proto`:
 
 ## Team
 
-- Naijei Jiang
-- Harshaan Chugh
+- Naijei Jiang*
+- Harshaan Chugh*
 - Tanvi Bhave
 - Sabrina Ning
 - Skai Nzeuton
