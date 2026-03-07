@@ -11,6 +11,10 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import org.springframework.stereotype.Service;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -19,9 +23,33 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
     //filename -> (chunkbit -> bytes)
     Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
 
+    public void seedTestFile() throws Exception {
+        int chunkSize = 10;
+        byte[] fileBytes = Files.readAllBytes(Path.of("Test.bin"));
+        Map<Integer, ByteString> chunkMap = new HashMap<>();
+        int chunkIndex = 0;
+        for (int i = 0; i < fileBytes.length; i += chunkSize) {
+            int end = Math.min(i + chunkSize, fileBytes.length);
+            byte[] chunk = Arrays.copyOfRange(fileBytes, i, end);
+            chunkMap.put(chunkIndex, ByteString.copyFrom(chunk));
+            chunkIndex++;
+        }
+        fileToChunk.put("Test.bin", chunkMap);
+    }
+
     @Override
     //receive FileRequest from client. send back chunkBitmap
     public void getAvailability(FileRequest request, StreamObserver<ChunkBitmap> responseObserver) {
+        try {
+            seedTestFile();
+        }
+        catch (Exception e) {
+            responseObserver.onError(Status.INTERNAL
+                    .withDescription("Failed to seed test file: " + e.getMessage())
+                    .asRuntimeException());
+            return;
+        }
+
         String fileName = request.getFileId();
         ChunkBitmap newBitMap;
         int chunks = 10; //ASSUME EACH FILE HAS 10 Chunks

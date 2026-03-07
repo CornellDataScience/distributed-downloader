@@ -9,6 +9,7 @@ option java_package = "cds.distdownloader.proto";
 // Peer sends this periodically (ex: every 5s).
 message HeartbeatRequest {
   PeerEndpoint endpoint = 1;
+  repeated string file_ids = 2;
 }
 message HeartbeatResponse {
   Ack ack = 1;
@@ -23,6 +24,6 @@ message ListPeersResponse {
 }
 
 service Tracker {
-  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
-  rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
+  rpc handleHeartbeatRequest(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc handleListPeersRequest(ListPeersRequest) returns (ListPeersResponse);
 }
