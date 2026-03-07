@@ -1,27 +1,33 @@
 package cds.distdownloader.peer;
 
-import cds.distdownloader.proto.ChunkBitmap;
-import cds.distdownloader.proto.ChunkRef;
-import cds.distdownloader.proto.ChunkRequest;
-import cds.distdownloader.proto.ChunkResponse;
-import cds.distdownloader.proto.FileRequest;
-import cds.distdownloader.proto.PeerGrpc;
+import cds.distdownloader.proto.*;
 import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
+
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.HashMap;
+import java.util.*;
 
 @Service
 public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1 2 4 // -> 0000010110
-    //filename -> (chunkbit -> bytes)
+    // filename -> (chunkbit -> bytes)
     Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
+    private final TrackerGrpc.TrackerBlockingStub trackerStub;
+
+    public PeerGrpcService() {
+        ManagedChannel channel = ManagedChannelBuilder
+                .forAddress("localhost", 9090)
+                .usePlaintext()
+                .build();
+        this.trackerStub = TrackerGrpc.newBlockingStub(channel);
+    }
 
     public void seedTestFile() throws Exception {
         int chunkSize = 10;
@@ -38,12 +44,11 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
     }
 
     @Override
-    //receive FileRequest from client. send back chunkBitmap
+    // receive FileRequest from client. send back chunkBitmap
     public void getAvailability(FileRequest request, StreamObserver<ChunkBitmap> responseObserver) {
         try {
             seedTestFile();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             responseObserver.onError(Status.INTERNAL
                     .withDescription("Failed to seed test file: " + e.getMessage())
                     .asRuntimeException());
@@ -52,14 +57,17 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
 
         String fileName = request.getFileId();
         ChunkBitmap newBitMap;
-        int chunks = 10; //ASSUME EACH FILE HAS 10 Chunks
-        //PeerEndpoint newPeer = PeerEndpoint.newBuilder().setId("1").setIp("2").setPort(123).build();
-        //For now assume we only have file "Test.bin", any other file request should be rejected
-        if (!fileName.startsWith("Test.bin")) {
+        int chunks = 10; // ASSUME EACH FILE HAS 10 Chunks
+
+        // For now assume we only have file "Test.bin", any other file request should be rejected
+        if (!fileName.equals("Test.bin")) {
             ByteString value = ByteString.EMPTY;
-            newBitMap = ChunkBitmap.newBuilder().setFileId(fileName).setNumChunks(chunks).setBitset(value).build();
-        }
-        else{
+            newBitMap = ChunkBitmap.newBuilder()
+                    .setFileId(fileName)
+                    .setNumChunks(chunks)
+                    .setBitset(value)
+                    .build();
+        } else {
             Map<Integer, ByteString> chunkMap = fileToChunk.getOrDefault(fileName, Map.of());
             ByteArrayOutputStream out = new ByteArrayOutputStream();
 
@@ -70,7 +78,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
                 int idx = chunks - i - 1; // chunk (chunks-1) ... chunk 0
                 int bit = chunkMap.containsKey(idx) ? 1 : 0;
 
-                currentByte = (currentByte << 1) | bit;  // shift then add bit
+                currentByte = (currentByte << 1) | bit;
                 bitCount++;
 
                 if (bitCount == 8) {
@@ -85,7 +93,11 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
             }
 
             ByteString value = ByteString.copyFrom(out.toByteArray());
-            newBitMap = ChunkBitmap.newBuilder().setFileId(fileName).setNumChunks(0).setBitset(value).build();
+            newBitMap = ChunkBitmap.newBuilder()
+                    .setFileId(fileName)
+                    .setNumChunks(chunks)
+                    .setBitset(value)
+                    .build();
         }
 
         responseObserver.onNext(newBitMap);
@@ -118,5 +130,29 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
                 .build();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
+    }
+
+    /*
+     * Sends heartbeat every 5 seconds to tracker, so that tracker can keep track of which peers are alive and which are not.
+     * If no heartbeat is received from a peer for 10 seconds, tracker will consider that to be a death.
+     */
+    @Scheduled(fixedRate = 5000)
+    public void sendHeartbeat() {
+        try {
+            PeerEndpoint peerEndpoint = PeerEndpoint.newBuilder()
+                    .setId("1")
+                    .setIp("127.0.0.1")
+                    .setPort(6001)
+                    .build();
+
+            HeartbeatRequest heartbeatRequest = HeartbeatRequest.newBuilder()
+                    .setEndpoint(peerEndpoint)
+                    .addAllFileIds(fileToChunk.keySet())
+                    .build();
+
+            trackerStub.heartbeat(heartbeatRequest);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
