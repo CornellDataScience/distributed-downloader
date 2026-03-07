@@ -36,7 +36,7 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
 
         // add peer to fileToPeers
         for (String fileId : fileIds) {
-            fileToPeers.putIfAbsent(fileId, new HashSet<>(Set.of(peerId)));
+            fileToPeers.computeIfAbsent(fileId, k -> new HashSet<>()).add(peerId);
         }
 
         HeartbeatResponse resp = HeartbeatResponse.newBuilder()
