@@ -1,0 +1,7 @@
+syntax = "proto3";
+package cds.distdownloader.v1;
+
+option java_multiple_files = true;
+option java_package = "cds.distdownloader.proto";
+
+import "common.proto";

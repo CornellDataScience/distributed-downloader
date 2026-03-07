@@ -1,3 +1,6 @@
 spring:
   application:
     name: tracker
+  grpc:
+    server:
+      port: 50051

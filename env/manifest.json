@@ -1,8 +1,8 @@
 {
-  "filename": "target.txt",
-  "filesize": "10",
-  "chunkSize": "1",
+  "filename": "Test.bin",
+  "filesize": "10485760",
+  "chunkSize": "1048576",
   "chunkCount": "10",
-  "origin": "https://example.com/target.txt",
+  "origin": "peer/Test.bin",
   "hashAlgorithm": "SHA-256"
 }

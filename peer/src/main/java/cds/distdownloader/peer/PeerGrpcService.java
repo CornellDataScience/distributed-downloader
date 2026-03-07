@@ -23,7 +23,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
 
     public PeerGrpcService() {
         ManagedChannel channel = ManagedChannelBuilder
-                .forAddress("localhost", 9090)
+                .forAddress("localhost", 50051)
                 .usePlaintext()
                 .build();
         this.trackerStub = TrackerGrpc.newBlockingStub(channel);
@@ -150,7 +150,8 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
                     .addAllFileIds(fileToChunk.keySet())
                     .build();
 
-            trackerStub.heartbeat(heartbeatRequest);
+            HeartbeatResponse response = trackerStub.handleHeartbeatRequest(heartbeatRequest);
+            System.out.println("Heartbeat sent. Ack = " + response.getAck().getOk());
         } catch (Exception e) {
             e.printStackTrace();
         }

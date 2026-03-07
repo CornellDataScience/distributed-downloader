@@ -76,6 +76,16 @@ mvn -pl tracker spring-boot:run
 mvn -pl peer spring-boot:run
 ```
 
+Shortcuts from repo root:
+
+```bash
+# Run tracker
+make t
+
+# Run peer
+make p
+```
+
 ## Generated gRPC Output
 
 After building `proto`:
