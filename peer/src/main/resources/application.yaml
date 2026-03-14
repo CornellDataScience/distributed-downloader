@@ -4,3 +4,7 @@ spring:
   grpc:
     server:
       port: 6001
+
+tracker:
+  address: localhost
+  port: 50051

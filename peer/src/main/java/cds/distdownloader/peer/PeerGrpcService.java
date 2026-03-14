@@ -8,6 +8,7 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -16,14 +17,19 @@ import java.nio.file.Path;
 import java.util.*;
 
 @Service
-public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1 2 4 // -> 0000010110
+public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 1 2 4 // -> 0000010110
     // filename -> (chunkbit -> bytes)
     Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
     private final TrackerGrpc.TrackerBlockingStub trackerStub;
 
-    public PeerGrpcService() {
+    /**
+     * Creates peer that connects to tracker at IP address
+     * `trackerAddress`:`trackerPort`. Default address is localhost:50051.
+     */
+    public PeerGrpcService(@Value("${tracker.address:localhost}") String trackerAddress,
+            @Value("${tracker.port:50051}") int trackerPort) {
         ManagedChannel channel = ManagedChannelBuilder
-                .forAddress("localhost", 50051)
+                .forAddress(trackerAddress, trackerPort)
                 .usePlaintext()
                 .build();
         this.trackerStub = TrackerGrpc.newBlockingStub(channel);
@@ -59,7 +65,8 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
         ChunkBitmap newBitMap;
         int chunks = 10; // ASSUME EACH FILE HAS 10 Chunks
 
-        // For now assume we only have file "Test.bin", any other file request should be rejected
+        // For now assume we only have file "Test.bin", any other file request should be
+        // rejected
         if (!fileName.equals("Test.bin")) {
             ByteString value = ByteString.EMPTY;
             newBitMap = ChunkBitmap.newBuilder()
@@ -133,8 +140,10 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { //"Test.bin", 10, 1
     }
 
     /*
-     * Sends heartbeat every 5 seconds to tracker, so that tracker can keep track of which peers are alive and which are not.
-     * If no heartbeat is received from a peer for 10 seconds, tracker will consider that to be a death.
+     * Sends heartbeat every 5 seconds to tracker, so that tracker can keep track of
+     * which peers are alive and which are not.
+     * If no heartbeat is received from a peer for 10 seconds, tracker will consider
+     * that to be a death.
      */
     @Scheduled(fixedRate = 5000)
     public void sendHeartbeat() {
