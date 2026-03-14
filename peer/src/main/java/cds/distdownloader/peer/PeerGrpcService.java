@@ -18,8 +18,17 @@ import java.util.*;
 
 @Service
 public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 1 2 4 // -> 0000010110
+    private static final String TEST_FILE_NAME = "Test.bin";
+    private static final Path[] TEST_FILE_PATH_CANDIDATES = {
+            Path.of(TEST_FILE_NAME),
+            Path.of("peer", TEST_FILE_NAME)
+    };
+    private static final int TEST_FILE_CHUNK_SIZE = 1024 * 1024;
+    private static final int TEST_FILE_CHUNK_COUNT = 10;
+
     // filename -> (chunkbit -> bytes)
     Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
+    private final Random random = new Random();
     private final TrackerGrpc.TrackerBlockingStub trackerStub;
 
     /**
@@ -36,17 +45,48 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
     }
 
     public void seedTestFile() throws Exception {
-        int chunkSize = 10;
-        byte[] fileBytes = Files.readAllBytes(Path.of("Test.bin"));
-        Map<Integer, ByteString> chunkMap = new HashMap<>();
-        int chunkIndex = 0;
-        for (int i = 0; i < fileBytes.length; i += chunkSize) {
-            int end = Math.min(i + chunkSize, fileBytes.length);
-            byte[] chunk = Arrays.copyOfRange(fileBytes, i, end);
-            chunkMap.put(chunkIndex, ByteString.copyFrom(chunk));
-            chunkIndex++;
+        if (fileToChunk.containsKey(TEST_FILE_NAME)) {
+            return;
         }
-        fileToChunk.put("Test.bin", chunkMap);
+
+        byte[] fileBytes = Files.readAllBytes(resolveTestFilePath());
+        List<byte[]> allChunks = new ArrayList<>();
+        for (int i = 0; i < fileBytes.length; i += TEST_FILE_CHUNK_SIZE) {
+            int end = Math.min(i + TEST_FILE_CHUNK_SIZE, fileBytes.length);
+            allChunks.add(Arrays.copyOfRange(fileBytes, i, end));
+        }
+
+        if (allChunks.size() != TEST_FILE_CHUNK_COUNT) {
+            throw new IllegalStateException("Expected " + TEST_FILE_CHUNK_COUNT + " chunks for "
+                    + TEST_FILE_NAME + " but found " + allChunks.size());
+        }
+
+        Map<Integer, ByteString> chunkMap = new HashMap<>();
+        int seededChunkCount = allChunks.size() > 1
+                ? random.nextInt(allChunks.size() - 1) + 1
+                : 1;
+        List<Integer> chunkIndices = new ArrayList<>();
+        for (int i = 0; i < allChunks.size(); i++) {
+            chunkIndices.add(i);
+        }
+        Collections.shuffle(chunkIndices, random);
+
+        for (int i = 0; i < seededChunkCount; i++) {
+            int chunkIndex = chunkIndices.get(i);
+            chunkMap.put(chunkIndex, ByteString.copyFrom(allChunks.get(chunkIndex)));
+        }
+        fileToChunk.put(TEST_FILE_NAME, chunkMap);
+    }
+
+    private Path resolveTestFilePath() {
+        for (Path candidate : TEST_FILE_PATH_CANDIDATES) {
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+
+        throw new IllegalStateException("Could not find " + TEST_FILE_NAME
+                + " in " + Arrays.toString(TEST_FILE_PATH_CANDIDATES));
     }
 
     @Override
@@ -63,11 +103,11 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
 
         String fileName = request.getFileId();
         ChunkBitmap newBitMap;
-        int chunks = 10; // ASSUME EACH FILE HAS 10 Chunks
+        int chunks = TEST_FILE_CHUNK_COUNT;
 
         // For now assume we only have file "Test.bin", any other file request should be
         // rejected
-        if (!fileName.equals("Test.bin")) {
+        if (!fileName.equals(TEST_FILE_NAME)) {
             ByteString value = ByteString.EMPTY;
             newBitMap = ChunkBitmap.newBuilder()
                     .setFileId(fileName)

@@ -1,23 +1,20 @@
 package cds.distdownloader.client;
 
 import cds.distdownloader.proto.ChunkBitmap;
-import cds.distdownloader.proto.ChunkRef;
-import cds.distdownloader.proto.ChunkRequest;
-import cds.distdownloader.proto.ChunkResponse;
 import cds.distdownloader.proto.FileRequest;
 import cds.distdownloader.proto.ListPeersRequest;
 import cds.distdownloader.proto.ListPeersResponse;
 import cds.distdownloader.proto.PeerEndpoint;
 import cds.distdownloader.proto.PeerGrpc;
 import cds.distdownloader.proto.TrackerGrpc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,30 +37,29 @@ public class ClientService {
         System.out.println("manifestPath=" + manifestPath);
 
         try {
-            getFile("Test.bin");
+            FileManifest manifest = readManifest();
+            getFile(manifest.filename(), manifest);
         } catch (Exception e) {
-            throw new RuntimeException("Download failed", e);
+            System.err.println("Download failed");
         }
     }
 
-    public void getFile(String fileId) throws IOException {
+    public void getFile(String fileId, FileManifest manifest) throws IOException {
         ManagedChannel trackerChannel = ManagedChannelBuilder
                 .forAddress(trackerHost, trackerPort)
                 .usePlaintext()
                 .build();
-
         TrackerGrpc.TrackerBlockingStub trackerStub = TrackerGrpc.newBlockingStub(trackerChannel);
 
-        ListPeersResponse peersResponse = trackerStub.listPeers(
+
+        ListPeersResponse peersResponse = trackerStub.handleListPeersRequest(
                 ListPeersRequest.newBuilder().build()
         );
 
-        List<PeerEndpoint> peers = peersResponse.getPeersList();
+        List<PeerEndpoint> peers = peersResponse.getUpPeersList();
 
         Map<Integer, PeerEndpoint> chunkToPeer = new HashMap<>();
-
-        //how to get from manifest?
-        int numChunks = -1
+        int numChunks = manifest.chunkCount();
 
         for (PeerEndpoint peer : peers) {
             ManagedChannel peerChannel = ManagedChannelBuilder
@@ -78,9 +74,12 @@ public class ClientService {
             );
 
             Set<Integer> availableChunks = parseBitmap(bitmap.getBitset(), bitmap.getNumChunks());
+            System.out.println("availableChunks = " + availableChunks);
             for (Integer chunkIdx : availableChunks) {
                 chunkToPeer.putIfAbsent(chunkIdx, peer);
             }
+
+
 
             peerChannel.shutdown();
         }
@@ -88,6 +87,31 @@ public class ClientService {
         trackerChannel.shutdown();
 
         //need to get actual contents of chunks with getChunk
+        Map<Integer, byte[]> downloadedChunks = new HashMap<>();
+
+        List<Integer> missingChunks = new ArrayList<>();
+        for (int chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
+            PeerEndpoint peer = chunkToPeer.get(chunkIdx);
+            if (peer == null) {
+                missingChunks.add(chunkIdx);
+                continue;
+            }
+
+            ManagedChannel peerChannel = ManagedChannelBuilder
+                    .forAddress(peer.getIp(), peer.getPort())
+                    .usePlaintext()
+                    .build();
+        }
+
+        if (!missingChunks.isEmpty()) {
+            throw new IllegalStateException("Missing peers for chunks " + missingChunks
+                    + ". With randomized peer seeding, one peer may not cover the full file.");
+        }
+    }
+
+    private FileManifest readManifest() throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return objectMapper.readValue(Path.of(manifestPath).toFile(), FileManifest.class);
     }
 
 
