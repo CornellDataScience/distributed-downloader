@@ -92,6 +92,26 @@ make c
 make pr
 ```
 
+Run with different IP addresses
+
+Laptop A (tracker):
+```bash
+# Find IP address
+ipconfig getifaddr en0
+
+# Start tracker
+mvn -pl tracker spring-boot:run -Dspring-boot.run.arguments="--spring.grpc.server.port=<trackerPort>"
+```
+
+Laptop B (peer):
+```bash
+# Verify connectivity
+grpcurl -plaintext <trackerAddress>:<trackerPort> list
+
+# Point peer to tracker IP
+mvn -pl peer spring-boot:run -Dspring-boot.run.arguments="--spring.grpc.server.port=<peerPort> --tracker.address=<trackerAddress> --tracker.port=<trackerPort>"
+```
+
 ## Generated gRPC Output
 
 After building `proto`:
