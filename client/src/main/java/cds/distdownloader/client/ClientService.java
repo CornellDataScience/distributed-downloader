@@ -1,5 +1,8 @@
 package cds.distdownloader.client;
 
+import cds.distdownloader.proto.ChunkRef;
+import cds.distdownloader.proto.ChunkResponse;
+import cds.distdownloader.proto.ChunkRequest;
 import cds.distdownloader.proto.ChunkBitmap;
 import cds.distdownloader.proto.FileRequest;
 import cds.distdownloader.proto.ListPeersRequest;
@@ -77,10 +80,8 @@ public class ClientService {
             System.out.println("availableChunks = " + availableChunks);
             for (Integer chunkIdx : availableChunks) {
                 chunkToPeer.putIfAbsent(chunkIdx, peer);
+                System.out.println("I just got " + chunkIdx);
             }
-
-
-
             peerChannel.shutdown();
         }
 
@@ -101,17 +102,18 @@ public class ClientService {
                     .forAddress(peer.getIp(), peer.getPort())
                     .usePlaintext()
                     .build();
-
             try {
                 PeerGrpc.PeerBlockingStub peerStub = PeerGrpc.newBlockingStub(peerChannel);
-
+                ChunkRef request = ChunkRef.newBuilder()
+                        .setFileId(fileId)
+                        .setChunkIndex(chunkIdx)
+                        .build();
+                System.out.println(request);
                 ChunkResponse response = peerStub.getChunk(
                         ChunkRequest.newBuilder()
-                                .setFileId(fileId)
-                                .setChunkIndex(chunkIdx)
+                                .setChunk(request)
                                 .build()
                 );
-
                 byte[] chunkBytes = response.getData().toByteArray();
                 downloadedChunks.put(chunkIdx, chunkBytes);
 

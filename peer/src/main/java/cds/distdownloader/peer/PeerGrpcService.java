@@ -175,6 +175,8 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
         ChunkResponse resp = ChunkResponse.newBuilder()
                 .setData(chunkBytes)
                 .build();
+        System.out.println("Sending");
+        System.out.println(resp);
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
