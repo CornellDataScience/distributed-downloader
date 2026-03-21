@@ -13,6 +13,7 @@ message HeartbeatRequest {
 }
 message HeartbeatResponse {
   Ack ack = 1;
+  string peer_id = 2;
 }
 
 // Returns only currently-up peers (not expired by TTL).
