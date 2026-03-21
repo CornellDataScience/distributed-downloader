@@ -31,7 +31,7 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
         // assign peerId if new peer, otherwise use existing Id
         String peerId;
 
-        if (peerMap.containsKey(peerEndPoint)){
+        if (!peerEndPoint.getId().equals("-1")){
             peerId = peerEndPoint.getId();
         }
         else {
@@ -54,7 +54,9 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
         }
 
         HeartbeatResponse resp = HeartbeatResponse.newBuilder()
-                .setAck(Ack.newBuilder().setOk(true).build()).setPeerId(peerId).build();
+                .setAck(Ack.newBuilder().setOk(true).build())
+                .setPeerId(peerId)
+                .build();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }

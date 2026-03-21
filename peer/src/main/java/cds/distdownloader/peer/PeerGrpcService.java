@@ -25,7 +25,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
     };
     private static final int TEST_FILE_CHUNK_SIZE = 1024 * 1024;
     private static final int TEST_FILE_CHUNK_COUNT = 10;
-
+    private String id = "-1";
     // filename -> (chunkbit -> bytes)
     Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
     private final Random random = new Random();
@@ -191,7 +191,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
     public void sendHeartbeat() {
         try {
             PeerEndpoint peerEndpoint = PeerEndpoint.newBuilder()
-                    .setId("-1")
+                    .setId(id)
                     .setIp("127.0.0.1")
                     .setPort(6001)
                     .build();
@@ -202,7 +202,11 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
                     .build();
 
             HeartbeatResponse response = trackerStub.handleHeartbeatRequest(heartbeatRequest);
-            System.out.println("Heartbeat sent. Ack = " + response.getAck().getOk());
+            if(id.equals("-1")){
+                id = response.getPeerId();
+                System.out.println(response.getPeerId());
+            }
+            System.out.println("Heartbeat sent. Ack = " + response.getAck().getOk() + "; ID: " + id);
         } catch (Exception e) {
             e.printStackTrace();
         }
