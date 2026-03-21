@@ -101,12 +101,49 @@ public class ClientService {
                     .forAddress(peer.getIp(), peer.getPort())
                     .usePlaintext()
                     .build();
+
+            try {
+                PeerGrpc.PeerBlockingStub peerStub = PeerGrpc.newBlockingStub(peerChannel);
+
+                ChunkResponse response = peerStub.getChunk(
+                        ChunkRequest.newBuilder()
+                                .setFileId(fileId)
+                                .setChunkIndex(chunkIdx)
+                                .build()
+                );
+
+                byte[] chunkBytes = response.getData().toByteArray();
+                downloadedChunks.put(chunkIdx, chunkBytes);
+
+                System.out.println("Downloaded chunk " + chunkIdx + " from "
+                        + peer.getIp() + ":" + peer.getPort());
+            } finally {
+                peerChannel.shutdown();
+            }
         }
 
         if (!missingChunks.isEmpty()) {
             throw new IllegalStateException("Missing peers for chunks " + missingChunks
                     + ". With randomized peer seeding, one peer may not cover the full file.");
         }
+    }
+
+    private void assembleFile(Map<Integer, byte[]> downloadedChunks, FileManifest manifest) throws IOException {
+        Path outputPath = Path.of("client", manifest.filename());
+
+        java.nio.file.Files.createDirectories(outputPath.getParent());
+
+        try (java.io.OutputStream out = java.nio.file.Files.newOutputStream(outputPath)) {
+            for (int i = 0; i < manifest.chunkCount(); i++) {
+                byte[] chunk = downloadedChunks.get(i);
+                if (chunk == null) {
+                    throw new IllegalStateException("Missing downloaded chunk " + i);
+                }
+                out.write(chunk);
+            }
+        }
+
+        System.out.println("File written to " + outputPath);
     }
 
     private FileManifest readManifest() throws IOException {
