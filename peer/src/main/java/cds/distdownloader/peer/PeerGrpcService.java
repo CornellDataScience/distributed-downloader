@@ -189,7 +189,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
     public void sendHeartbeat() {
         try {
             PeerEndpoint peerEndpoint = PeerEndpoint.newBuilder()
-                    .setId("1")
+                    .setId("-1")
                     .setIp("127.0.0.1")
                     .setPort(6001)
                     .build();

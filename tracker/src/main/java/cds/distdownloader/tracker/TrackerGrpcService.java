@@ -18,18 +18,32 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
     private final Map<String, Set<String>> peerToFiles = new HashMap<>();
     private final Map<String, Set<String>> fileToPeers = new HashMap<>();
 
+    // assigns id:port --> tracker assigned peerID
+    private final Map<String, String> endpointToPeerID = new HashMap<>();
+
+    private Integer nextUUID = 0;
+
     //Peer will send a heart beat to tracker(5s) , if no heart beat is seen in the last 10 second delete them
     @Override
     public synchronized void handleHeartbeatRequest(HeartbeatRequest request,
             StreamObserver<HeartbeatResponse> responseObserver) {
         PeerEndpoint peerEndPoint = request.getEndpoint();
+        // assign peerId if new peer, otherwise use existing Id
+        String peerId;
+
+        if (peerMap.containsKey(peerEndPoint)){
+            peerId = peerEndPoint.getId();
+        }
+        else {
+            // assign new peer a given UUID
+            nextUUID += 1;
+            peerId = nextUUID.toString();
+        }
+
+        peerToEndpoint.put(peerId, peerEndPoint);
         peerMap.put(peerEndPoint, Instant.now());
 
-        String peerId = peerEndPoint.getId();
         Set<String> fileIds = new HashSet<>(request.getFileIdsList());
-
-        // add peer to peerToEndpoint
-        peerToEndpoint.put(peerId, peerEndPoint);
 
         // add files to peerToFiles
         peerToFiles.put(peerId, fileIds);
@@ -40,7 +54,7 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
         }
 
         HeartbeatResponse resp = HeartbeatResponse.newBuilder()
-                .setAck(Ack.newBuilder().setOk(true).build()).build();
+                .setAck(Ack.newBuilder().setOk(true).build()).setPeerId(peerId).build();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
