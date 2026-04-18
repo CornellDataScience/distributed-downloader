@@ -76,7 +76,7 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
         for (PeerEndpoint peer : peers) {
             Instant lastSeen = peerMap.get(peer);
             if (lastSeen.isBefore(cutoff)) {
-                peerMap.remove(peer);
+                removePeer(peer);
             }
         }
 
@@ -100,5 +100,29 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
         }
 
         return peers;
+    }
+
+    public synchronized void removePeer(PeerEndpoint endpoint) {
+        // TODO: Ensure all objects are in map before removal
+        String peerId = endpoint.getId();
+
+        peerMap.remove(endpoint);
+        peerToEndpoint.remove(peerId);
+
+        if (peerToFiles.containsKey(peerId)) {
+            Set<String> files = peerToFiles.remove(peerId);
+
+            for (String file : files) {
+                fileToPeers.get(file).remove(peerId);
+
+                if (fileToPeers.get(file).isEmpty()) {
+                    fileToPeers.remove(file);
+                }
+            }
+        }
+
+        if (endpointToPeerID.containsKey(endpoint)) {
+            endpointToPeerID.remove(endpoint);
+        }
     }
 }
