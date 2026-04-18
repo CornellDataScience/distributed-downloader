@@ -3,7 +3,7 @@ spring:
     name: peer
   grpc:
     server:
-      port: 6001
+      port: ${peer.port:6001}
 
 tracker:
   address: localhost

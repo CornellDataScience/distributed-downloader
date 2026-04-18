@@ -4,7 +4,7 @@ tracker:
 	mvn -pl tracker spring-boot:run
 
 peer:
-	mvn -pl peer spring-boot:run
+	mvn -pl peer spring-boot:run -Dspring-boot.run.arguments="--peer.port=$(PORT)"
 
 client:
 	mvn -f client/pom.xml -DskipTests compile exec:java -Dexec.mainClass=cds.distdownloader.client.Client

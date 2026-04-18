@@ -2,54 +2,72 @@ package cds.distdownloader.tracker;
 
 import cds.distdownloader.proto.*;
 import io.grpc.stub.StreamObserver;
-import java.util.HashSet;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
 import java.time.Instant;
+import java.util.*;
 
 @Service
 public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
 
-    // https://www.geeksforgeeks.org/java/java-time-instant-class-in-java/
-    // who is alive; peer -> last seen
+    // peerId -> latest endpoint
     private final Map<String, PeerEndpoint> peerToEndpoint = new HashMap<>();
-    private final Map<PeerEndpoint, Instant> peerMap = new HashMap<>();
+
+    // peerId -> last heartbeat time
+    private final Map<String, Instant> peerLastSeen = new HashMap<>();
+
+    // peerId -> files this peer currently advertises
     private final Map<String, Set<String>> peerToFiles = new HashMap<>();
+
+    // fileId -> peerIds that advertise it
     private final Map<String, Set<String>> fileToPeers = new HashMap<>();
 
-    // assigns id:port --> tracker assigned peerID
-    private final Map<String, String> endpointToPeerID = new HashMap<>();
+    private int nextUUID = 0;
 
-    private Integer nextUUID = 0;
-
-    //Peer will send a heart beat to tracker(5s) , if no heart beat is seen in the last 10 second delete them
     @Override
-    public synchronized void handleHeartbeatRequest(HeartbeatRequest request,
-            StreamObserver<HeartbeatResponse> responseObserver) {
-        PeerEndpoint peerEndPoint = request.getEndpoint();
-        // assign peerId if new peer, otherwise use existing Id
+    public synchronized void handleHeartbeatRequest(
+            HeartbeatRequest request,
+            StreamObserver<HeartbeatResponse> responseObserver
+    ) {
+        PeerEndpoint incoming = request.getEndpoint();
+
         String peerId;
-
-        if (!peerEndPoint.getId().equals("-1")){
-            peerId = peerEndPoint.getId();
-        }
-        else {
-            // assign new peer a given UUID
+        if (!incoming.getId().equals("-1")) {
+            peerId = incoming.getId();
+        } else {
             nextUUID += 1;
-            peerId = nextUUID.toString();
+            peerId = Integer.toString(nextUUID);
         }
 
-        peerToEndpoint.put(peerId, peerEndPoint);
-        peerMap.put(peerEndPoint, Instant.now());
+        // Canonicalize endpoint so tracker always stores the assigned peerId
+        PeerEndpoint canonicalEndpoint = PeerEndpoint.newBuilder()
+                .setId(peerId)
+                .setIp(incoming.getIp())
+                .setPort(incoming.getPort())
+                .build();
 
-        Set<String> fileIds = new HashSet<>(request.getFileIdsList());
+        peerToEndpoint.put(peerId, canonicalEndpoint);
+        peerLastSeen.put(peerId, Instant.now());
 
-        // add files to peerToFiles
-        peerToFiles.put(peerId, fileIds);
+        Set<String> newFiles = new HashSet<>(request.getFileIdsList());
+        Set<String> oldFiles = peerToFiles.getOrDefault(peerId, Collections.emptySet());
 
-        // add peer to fileToPeers
-        for (String fileId : fileIds) {
+        // Remove peer from files it no longer serves
+        for (String oldFile : oldFiles) {
+            if (!newFiles.contains(oldFile)) {
+                Set<String> peersForFile = fileToPeers.get(oldFile);
+                if (peersForFile != null) {
+                    peersForFile.remove(peerId);
+                    if (peersForFile.isEmpty()) {
+                        fileToPeers.remove(oldFile);
+                    }
+                }
+            }
+        }
+
+        // Add/update files for this peer
+        peerToFiles.put(peerId, newFiles);
+        for (String fileId : newFiles) {
             fileToPeers.computeIfAbsent(fileId, k -> new HashSet<>()).add(peerId);
         }
 
@@ -57,72 +75,72 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
                 .setAck(Ack.newBuilder().setOk(true).build())
                 .setPeerId(peerId)
                 .build();
+
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 
     @Override
-    /*
-      Loop through all peers in the map, and delete all that were 10+ seconds
-      from the current instant.
-      Then, we will send out a list version of the keySet
-     */
-    public synchronized void handleListPeersRequest(ListPeersRequest request,
-            StreamObserver<ListPeersResponse> responseObserver) {
-        Set<PeerEndpoint> peers = new HashSet<>(peerMap.keySet());
+    public synchronized void handleListPeersRequest(
+            ListPeersRequest request,
+            StreamObserver<ListPeersResponse> responseObserver
+    ) {
+        pruneDeadPeers();
 
-        Instant timeNow = Instant.now();
-        Instant cutoff = timeNow.minusSeconds(10);
-        for (PeerEndpoint peer : peers) {
-            Instant lastSeen = peerMap.get(peer);
-            if (lastSeen.isBefore(cutoff)) {
-                removePeer(peer);
-            }
-        }
+        ListPeersResponse response = ListPeersResponse.newBuilder()
+                .addAllUpPeers(peerToEndpoint.values())
+                .build();
 
-        List<PeerEndpoint> peerList = new ArrayList<>(peerMap.keySet());
-        ListPeersResponse response = ListPeersResponse.newBuilder().addAllUpPeers(peerList).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
-    private synchronized List<String> getPeersByFile(String fileId) {
-        List<String> peers = new ArrayList<>();
+    // Optional helper if later you add a "list peers for file" RPC
+    private synchronized List<PeerEndpoint> getPeersByFile(String fileId) {
+        pruneDeadPeers();
 
-        Instant timeNow = Instant.now();
-        Instant cutoff = timeNow.minusSeconds(10);
+        List<PeerEndpoint> peers = new ArrayList<>();
         for (String peerId : fileToPeers.getOrDefault(fileId, Collections.emptySet())) {
             PeerEndpoint endpoint = peerToEndpoint.get(peerId);
-            Instant lastSeen = peerMap.get(endpoint);
-            if (lastSeen != null && !lastSeen.isBefore(cutoff)) {
-                peers.add(peerId);
+            if (endpoint != null) {
+                peers.add(endpoint);
             }
         }
-
         return peers;
     }
 
-    public synchronized void removePeer(PeerEndpoint endpoint) {
-        // TODO: Ensure all objects are in map before removal
-        String peerId = endpoint.getId();
+    private synchronized void pruneDeadPeers() {
+        Instant cutoff = Instant.now().minusSeconds(10);
+        List<String> deadPeerIds = new ArrayList<>();
 
-        peerMap.remove(endpoint);
-        peerToEndpoint.remove(peerId);
-
-        if (peerToFiles.containsKey(peerId)) {
-            Set<String> files = peerToFiles.remove(peerId);
-
-            for (String file : files) {
-                fileToPeers.get(file).remove(peerId);
-
-                if (fileToPeers.get(file).isEmpty()) {
-                    fileToPeers.remove(file);
-                }
+        for (Map.Entry<String, Instant> entry : peerLastSeen.entrySet()) {
+            if (entry.getValue().isBefore(cutoff)) {
+                deadPeerIds.add(entry.getKey());
             }
         }
 
-        if (endpointToPeerID.containsKey(endpoint)) {
-            endpointToPeerID.remove(endpoint);
+        for (String peerId : deadPeerIds) {
+            removePeer(peerId);
+        }
+    }
+
+    public synchronized void removePeer(String peerId) {
+        peerLastSeen.remove(peerId);
+        peerToEndpoint.remove(peerId);
+
+        Set<String> files = peerToFiles.remove(peerId);
+        if (files == null) {
+            return;
+        }
+
+        for (String fileId : files) {
+            Set<String> peersForFile = fileToPeers.get(fileId);
+            if (peersForFile != null) {
+                peersForFile.remove(peerId);
+                if (peersForFile.isEmpty()) {
+                    fileToPeers.remove(fileId);
+                }
+            }
         }
     }
 }

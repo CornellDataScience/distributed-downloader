@@ -31,6 +31,10 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
     private final Random random = new Random();
     private final TrackerGrpc.TrackerBlockingStub trackerStub;
 
+    @Value("${peer.port:6001}")
+    private int port = 6001;
+
+
     /**
      * Creates peer that connects to tracker at IP address
      * `trackerAddress`:`trackerPort`. Default address is localhost:50051.
@@ -62,15 +66,12 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
         }
 
         Map<Integer, ByteString> chunkMap = new HashMap<>();
-        int seededChunkCount = allChunks.size() > 1
-                ? random.nextInt(allChunks.size() - 1) + 1
-                : 1;
+        int seededChunkCount = random.nextInt(allChunks.size()) + 1;
         List<Integer> chunkIndices = new ArrayList<>();
         for (int i = 0; i < allChunks.size(); i++) {
             chunkIndices.add(i);
         }
         Collections.shuffle(chunkIndices, random);
-
         for (int i = 0; i < seededChunkCount; i++) {
             int chunkIndex = chunkIndices.get(i);
             chunkMap.put(chunkIndex, ByteString.copyFrom(allChunks.get(chunkIndex)));
@@ -176,7 +177,6 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
                 .setData(chunkBytes)
                 .build();
         System.out.println("Sending");
-        System.out.println(resp);
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -193,7 +193,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
             PeerEndpoint peerEndpoint = PeerEndpoint.newBuilder()
                     .setId(id)
                     .setIp("127.0.0.1")
-                    .setPort(6001)
+                    .setPort(port)
                     .build();
 
             HeartbeatRequest heartbeatRequest = HeartbeatRequest.newBuilder()
