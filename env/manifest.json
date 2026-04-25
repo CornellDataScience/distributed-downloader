@@ -23,6 +23,14 @@
       "chunkCount": 100,
       "origin": "peer/Test100mb.bin",
       "hashAlgorithm": "SHA-256"
+    },
+    {
+      "filename": "Test1gb.bin",
+      "filesize": 1000000000,
+      "chunkSize": 10000000,
+      "chunkCount": 100,
+      "origin": "peer/Test1gb.bin",
+      "hashAlgorithm": "SHA-256"
     }
   ]
 }

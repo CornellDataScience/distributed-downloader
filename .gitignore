@@ -4,3 +4,7 @@
 # IDE / OS noise
 .idea/
 .DS_Store
+
+# Generated download speed-test files
+peer/Test1gb.bin
+client/Test*.bin

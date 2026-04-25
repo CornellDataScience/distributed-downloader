@@ -8,6 +8,7 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,11 +20,15 @@ import java.util.*;
 
 @Service
 public class PeerGrpcService extends PeerGrpc.PeerImplBase {
-    private static final int DEMO_FILE_CHUNK_SIZE = 1024 * 1024;
-    private static final List<String> DEMO_FILE_NAMES = List.of(
-            "Test.bin",
-            "Test1mb.bin",
-            "Test100mb.bin"
+    private record DemoFile(String fileName, int chunkSize) {
+    }
+
+    private static final int ONE_MIB = 1024 * 1024;
+    private static final List<DemoFile> DEMO_FILES = List.of(
+            new DemoFile("Test.bin", ONE_MIB),
+            new DemoFile("Test1mb.bin", ONE_MIB),
+            new DemoFile("Test100mb.bin", ONE_MIB),
+            new DemoFile("Test1gb.bin", 10_000_000)
     );
 
     private String id = "-1";
@@ -54,47 +59,81 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
     }
 
     public synchronized void seedDemoFiles() throws Exception {
-        if (fileToChunk.keySet().containsAll(DEMO_FILE_NAMES)) {
+        if (fileToChunk.keySet().containsAll(demoFileNames())) {
             return;
         }
 
-        for (String fileName : DEMO_FILE_NAMES) {
-            seedDemoFile(fileName);
+        for (DemoFile demoFile : DEMO_FILES) {
+            seedDemoFile(demoFile);
         }
     }
 
-    private void seedDemoFile(String fileName) throws Exception {
+    private static List<String> demoFileNames() {
+        return DEMO_FILES.stream()
+                .map(DemoFile::fileName)
+                .toList();
+    }
+
+    private void seedDemoFile(DemoFile demoFile) throws Exception {
+        String fileName = demoFile.fileName();
         if (fileToChunk.containsKey(fileName)) {
             return;
         }
 
-        byte[] fileBytes = Files.readAllBytes(resolveDemoFilePath(fileName));
-        List<byte[]> allChunks = new ArrayList<>();
-        for (int i = 0; i < fileBytes.length; i += DEMO_FILE_CHUNK_SIZE) {
-            int end = Math.min(i + DEMO_FILE_CHUNK_SIZE, fileBytes.length);
-            allChunks.add(Arrays.copyOfRange(fileBytes, i, end));
-        }
-
-        if (allChunks.isEmpty()) {
+        Path filePath = resolveDemoFilePath(fileName);
+        long fileSize = Files.size(filePath);
+        if (fileSize == 0) {
             throw new IllegalStateException("Demo file " + fileName + " is empty.");
         }
 
+        int chunkCount = (int) ((fileSize + demoFile.chunkSize() - 1) / demoFile.chunkSize());
+        Set<Integer> selectedChunks = selectRandomChunks(chunkCount);
         Map<Integer, ByteString> chunkMap = new HashMap<>();
-        int seededChunkCount = random.nextInt(allChunks.size()) + 1;
-        List<Integer> chunkIndices = new ArrayList<>();
-        for (int i = 0; i < allChunks.size(); i++) {
-            chunkIndices.add(i);
-        }
-        Collections.shuffle(chunkIndices, random);
-        for (int i = 0; i < seededChunkCount; i++) {
-            int chunkIndex = chunkIndices.get(i);
-            chunkMap.put(chunkIndex, ByteString.copyFrom(allChunks.get(chunkIndex)));
+
+        try (InputStream input = Files.newInputStream(filePath)) {
+            byte[] buffer = new byte[demoFile.chunkSize()];
+            for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+                int bytesRead = readChunk(input, buffer);
+                if (bytesRead == -1) {
+                    break;
+                }
+                if (selectedChunks.contains(chunkIndex)) {
+                    chunkMap.put(chunkIndex, ByteString.copyFrom(buffer, 0, bytesRead));
+                }
+            }
         }
 
         fileToChunk.put(fileName, chunkMap);
-        fileToChunkCount.put(fileName, allChunks.size());
-        System.out.println("Seeded " + seededChunkCount + "/" + allChunks.size()
+        fileToChunkCount.put(fileName, chunkCount);
+        System.out.println("Seeded " + chunkMap.size() + "/" + chunkCount
                 + " chunks for " + fileName);
+    }
+
+    private Set<Integer> selectRandomChunks(int chunkCount) {
+        int seededChunkCount = random.nextInt(chunkCount) + 1;
+        List<Integer> chunkIndices = new ArrayList<>();
+        for (int i = 0; i < chunkCount; i++) {
+            chunkIndices.add(i);
+        }
+        Collections.shuffle(chunkIndices, random);
+
+        Set<Integer> selectedChunks = new HashSet<>();
+        for (int i = 0; i < seededChunkCount; i++) {
+            selectedChunks.add(chunkIndices.get(i));
+        }
+        return selectedChunks;
+    }
+
+    private int readChunk(InputStream input, byte[] buffer) throws Exception {
+        int totalRead = 0;
+        while (totalRead < buffer.length) {
+            int bytesRead = input.read(buffer, totalRead, buffer.length - totalRead);
+            if (bytesRead == -1) {
+                return totalRead == 0 ? -1 : totalRead;
+            }
+            totalRead += bytesRead;
+        }
+        return totalRead;
     }
 
     private Path resolveDemoFilePath(String fileName) {
