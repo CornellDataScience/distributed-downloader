@@ -4,7 +4,6 @@
       "filename": "Test.bin",
       "filesize": 104857600,
       "chunkSize": 1048576,
-      "chunkCount": 100,
       "origin": "peer/Test.bin",
       "hashAlgorithm": "SHA-256"
     },
@@ -12,7 +11,6 @@
       "filename": "Test1mb.bin",
       "filesize": 1048576,
       "chunkSize": 1048576,
-      "chunkCount": 1,
       "origin": "peer/Test1mb.bin",
       "hashAlgorithm": "SHA-256"
     },
@@ -20,15 +18,13 @@
       "filename": "Test100mb.bin",
       "filesize": 104857600,
       "chunkSize": 1048576,
-      "chunkCount": 100,
       "origin": "peer/Test100mb.bin",
       "hashAlgorithm": "SHA-256"
     },
     {
       "filename": "Test1gb.bin",
       "filesize": 1000000000,
-      "chunkSize": 10000000,
-      "chunkCount": 100,
+      "chunkSize": 1000000,
       "origin": "peer/Test1gb.bin",
       "hashAlgorithm": "SHA-256"
     }

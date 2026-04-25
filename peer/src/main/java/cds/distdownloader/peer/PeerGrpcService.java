@@ -28,7 +28,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
             new DemoFile("Test.bin", ONE_MIB),
             new DemoFile("Test1mb.bin", ONE_MIB),
             new DemoFile("Test100mb.bin", ONE_MIB),
-            new DemoFile("Test1gb.bin", 10_000_000)
+            new DemoFile("Test1gb.bin", 1_000_000)
     );
 
     private String id = "-1";

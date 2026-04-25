@@ -93,7 +93,7 @@ public class ClientService {
                 throw new IllegalStateException("Tracker returned no live peers.");
             }
 
-            int numChunks = manifest.chunkCount();
+            int numChunks = manifest.resolvedChunkCount();
             if (numChunks <= 0) {
                 throw new IllegalArgumentException("Manifest must contain at least one chunk.");
             }
@@ -191,7 +191,7 @@ public class ClientService {
             Map<Integer, List<PeerEndpoint>> chunkToPeer,
             int threadCount
     ) throws IOException {
-        int numChunks = manifest.chunkCount();
+        int numChunks = manifest.resolvedChunkCount();
         Map<Integer, byte[]> downloadedChunks = new ConcurrentHashMap<>();
         List<Integer> missingChunks = Collections.synchronizedList(new ArrayList<>());
         List<String> failedChunks = Collections.synchronizedList(new ArrayList<>());
@@ -310,7 +310,7 @@ public class ClientService {
         java.nio.file.Files.createDirectories(outputPath.getParent());
 
         try (java.io.OutputStream out = java.nio.file.Files.newOutputStream(outputPath)) {
-            for (int i = 0; i < manifest.chunkCount(); i++) {
+            for (int i = 0; i < manifest.resolvedChunkCount(); i++) {
                 byte[] chunk = downloadedChunks.get(i);
                 if (chunk == null) {
                     throw new IllegalStateException("Missing downloaded chunk " + i);
