@@ -30,17 +30,34 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 public class ClientService {
+    /** When {@link ClientConcurrencyConfig#maxDownloadParallelism()} is 0, use at least this many download threads. */
+    private static final int DEFAULT_MIN_DOWNLOAD_THREADS = 32;
+    /** When max download is 0, use this multiple of peer count (was 2, raised for less restriction). */
+    private static final int DEFAULT_DOWNLOAD_THREADS_PER_PEER = 8;
+
     private final String trackerHost;
     private final int trackerPort;
     private final String manifestPath;
     private final String requestedFilename;
+    private final ClientConcurrencyConfig concurrency;
     private final Map<String, ManagedChannel> peerChannelCache = new ConcurrentHashMap<>();
 
     public ClientService(String trackerHost, int trackerPort, String manifestPath, String requestedFilename) {
+        this(trackerHost, trackerPort, manifestPath, requestedFilename, ClientConcurrencyConfig.DEFAULT);
+    }
+
+    public ClientService(
+            String trackerHost,
+            int trackerPort,
+            String manifestPath,
+            String requestedFilename,
+            ClientConcurrencyConfig concurrency
+    ) {
         this.trackerHost = trackerHost;
         this.trackerPort = trackerPort;
         this.manifestPath = manifestPath;
         this.requestedFilename = requestedFilename;
+        this.concurrency = concurrency;
     }
 
     public void start() {
@@ -81,10 +98,16 @@ public class ClientService {
                 throw new IllegalArgumentException("Manifest must contain at least one chunk.");
             }
 
-            Map<Integer, List<PeerEndpoint>> chunkToPeer = Collections.synchronizedMap(new HashMap<>());
-            collectAvailabilityParallel(fileId, peers, chunkToPeer);
+            int availabilityThreads = resolveAvailabilityThreadCount(peers.size());
+            int downloadThreads = resolveDownloadThreadCount(numChunks, peers.size());
+            System.out.println("Parallelism: availabilityThreads=" + availabilityThreads
+                    + ", downloadThreads=" + downloadThreads
+                    + " (peers=" + peers.size() + ", chunks=" + numChunks + ")");
 
-            downloadChunks(fileId, manifest, peers, chunkToPeer);
+            Map<Integer, List<PeerEndpoint>> chunkToPeer = Collections.synchronizedMap(new HashMap<>());
+            collectAvailabilityParallel(fileId, peers, chunkToPeer, availabilityThreads);
+
+            downloadChunks(fileId, manifest, chunkToPeer, downloadThreads);
             printSpeedSummary(manifest, startNanos);
         } finally {
             trackerChannel.shutdown();
@@ -92,12 +115,29 @@ public class ClientService {
         }
     }
 
+    private int resolveAvailabilityThreadCount(int numPeers) {
+        if (concurrency.maxAvailabilityParallelism() > 0) {
+            return Math.max(1, Math.min(numPeers, concurrency.maxAvailabilityParallelism()));
+        }
+        // Default: one worker per live peer (no cap at 16).
+        return numPeers;
+    }
+
+    private int resolveDownloadThreadCount(int numChunks, int numPeers) {
+        if (concurrency.maxDownloadParallelism() > 0) {
+            return Math.max(1, Math.min(numChunks, concurrency.maxDownloadParallelism()));
+        }
+        // Default: allow more in-flight work than the old (2 × peers) cap.
+        int derived = Math.max(DEFAULT_MIN_DOWNLOAD_THREADS, numPeers * DEFAULT_DOWNLOAD_THREADS_PER_PEER);
+        return Math.max(1, Math.min(numChunks, derived));
+    }
+
     private void collectAvailabilityParallel(
             String fileId,
             List<PeerEndpoint> peers,
-            Map<Integer, List<PeerEndpoint>> chunkToPeer
+            Map<Integer, List<PeerEndpoint>> chunkToPeer,
+            int threadCount
     ) throws IOException {
-        int threadCount = Math.min(peers.size(), 16);  // Limit threads for connection pooling
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
         try {
@@ -126,11 +166,7 @@ public class ClientService {
             PeerEndpoint peer,
             Map<Integer, List<PeerEndpoint>> chunkToPeer
     ) {
-        ManagedChannel peerChannel = ManagedChannelBuilder
-                .forAddress(peer.getIp(), peer.getPort())
-                .usePlaintext()
-                .build();
-
+        ManagedChannel peerChannel = getOrCreateChannel(peer);
         try {
             PeerGrpc.PeerBlockingStub peerStub = PeerGrpc.newBlockingStub(peerChannel);
 
@@ -146,23 +182,20 @@ public class ClientService {
             }
         } catch (Exception e) {
             System.err.println("Error querying peer " + peer.getIp() + ":" + peer.getPort() + ": " + e.getMessage());
-        } finally {
-            peerChannel.shutdown();
         }
     }
 
     private void downloadChunks(
             String fileId,
             FileManifest manifest,
-            List<PeerEndpoint> peers,
-            Map<Integer, List<PeerEndpoint>> chunkToPeer
+            Map<Integer, List<PeerEndpoint>> chunkToPeer,
+            int threadCount
     ) throws IOException {
         int numChunks = manifest.chunkCount();
         Map<Integer, byte[]> downloadedChunks = new ConcurrentHashMap<>();
         List<Integer> missingChunks = Collections.synchronizedList(new ArrayList<>());
         List<String> failedChunks = Collections.synchronizedList(new ArrayList<>());
 
-        int threadCount = Math.min(numChunks, peers.size() * 2);
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
         try {
