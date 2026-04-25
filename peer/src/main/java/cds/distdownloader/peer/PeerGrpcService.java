@@ -36,6 +36,9 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
     @Value("${peer.port:6001}")
     private int port = 6001;
 
+    @Value("${peer.advertise-address:127.0.0.1}")
+    private String advertiseAddress = "127.0.0.1";
+
 
     /**
      * Creates peer that connects to tracker at IP address
@@ -202,7 +205,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
 
             PeerEndpoint peerEndpoint = PeerEndpoint.newBuilder()
                     .setId(id)
-                    .setIp("127.0.0.1")
+                    .setIp(advertiseAddress)
                     .setPort(port)
                     .build();
 

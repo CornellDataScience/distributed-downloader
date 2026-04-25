@@ -8,3 +8,6 @@ spring:
 tracker:
   address: localhost
   port: 50051
+
+peer:
+  advertise-address: 127.0.0.1

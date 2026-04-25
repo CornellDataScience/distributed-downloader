@@ -57,6 +57,8 @@ public class ClientService {
     }
 
     public void getFile(String fileId, FileManifest manifest) throws IOException {
+        long startNanos = System.nanoTime();
+
         ManagedChannel trackerChannel = ManagedChannelBuilder
                 .forAddress(trackerHost, trackerPort)
                 .usePlaintext()
@@ -84,6 +86,7 @@ public class ClientService {
             }
 
             downloadChunks(fileId, manifest, peers, chunkToPeer);
+            printSpeedSummary(manifest, startNanos);
         } finally {
             trackerChannel.shutdown();
         }
@@ -243,6 +246,18 @@ public class ClientService {
         }
 
         System.out.println("File written to " + outputPath);
+    }
+
+    private void printSpeedSummary(FileManifest manifest, long startNanos) {
+        long elapsedNanos = System.nanoTime() - startNanos;
+        double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
+        double mib = manifest.filesize() / (1024.0 * 1024.0);
+        double mibPerSecond = elapsedSeconds == 0 ? 0 : mib / elapsedSeconds;
+
+        System.out.printf("Downloaded %.2f MiB in %.2f seconds (%.2f MiB/s)%n",
+                mib,
+                elapsedSeconds,
+                mibPerSecond);
     }
 
     private FileManifestCatalog readManifestCatalog() throws IOException {
