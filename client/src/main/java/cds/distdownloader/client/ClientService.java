@@ -33,19 +33,22 @@ public class ClientService {
     private final String trackerHost;
     private final int trackerPort;
     private final String manifestPath;
+    private final String requestedFilename;
 
-    public ClientService(String trackerHost, int trackerPort, String manifestPath) {
+    public ClientService(String trackerHost, int trackerPort, String manifestPath, String requestedFilename) {
         this.trackerHost = trackerHost;
         this.trackerPort = trackerPort;
         this.manifestPath = manifestPath;
+        this.requestedFilename = requestedFilename;
     }
 
     public void start() {
         System.out.println("trackerHost=" + trackerHost + ", trackerPort=" + trackerPort);
         System.out.println("manifestPath=" + manifestPath);
+        System.out.println("requestedFilename=" + (requestedFilename == null ? "<default>" : requestedFilename));
 
         try {
-            FileManifest manifest = readManifest();
+            FileManifest manifest = readManifestCatalog().findByFilename(requestedFilename);
             getFile(manifest.filename(), manifest);
         } catch (Exception e) {
             System.err.println("Download failed, Error: " + e);
@@ -242,9 +245,9 @@ public class ClientService {
         System.out.println("File written to " + outputPath);
     }
 
-    private FileManifest readManifest() throws IOException {
+    private FileManifestCatalog readManifestCatalog() throws IOException {
         ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.readValue(Path.of(manifestPath).toFile(), FileManifest.class);
+        return objectMapper.readValue(Path.of(manifestPath).toFile(), FileManifestCatalog.class);
     }
 
     private Set<Integer> parseBitmap(ByteString bitset, int numChunks) {

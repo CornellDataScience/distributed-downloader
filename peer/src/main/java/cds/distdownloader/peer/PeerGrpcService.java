@@ -6,6 +6,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+
 import java.io.ByteArrayOutputStream;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -17,17 +18,18 @@ import java.nio.file.Path;
 import java.util.*;
 
 @Service
-public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 1 2 4 // -> 0000010110
-    private static final String TEST_FILE_NAME = "Test.bin";
-    private static final Path[] TEST_FILE_PATH_CANDIDATES = {
-            Path.of(TEST_FILE_NAME),
-            Path.of("peer", TEST_FILE_NAME)
-    };
-    private static final int TEST_FILE_CHUNK_SIZE = 1024 * 1024;
-    private static final int TEST_FILE_CHUNK_COUNT = 10;
+public class PeerGrpcService extends PeerGrpc.PeerImplBase {
+    private static final int DEMO_FILE_CHUNK_SIZE = 1024 * 1024;
+    private static final List<String> DEMO_FILE_NAMES = List.of(
+            "Test.bin",
+            "Test1mb.bin",
+            "Test100mb.bin"
+    );
+
     private String id = "-1";
     // filename -> (chunkbit -> bytes)
-    Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
+    private final Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
+    private final Map<String, Integer> fileToChunkCount = new HashMap<>();
     private final Random random = new Random();
     private final TrackerGrpc.TrackerBlockingStub trackerStub;
 
@@ -48,21 +50,30 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
         this.trackerStub = TrackerGrpc.newBlockingStub(channel);
     }
 
-    public void seedTestFile() throws Exception {
-        if (fileToChunk.containsKey(TEST_FILE_NAME)) {
+    public synchronized void seedDemoFiles() throws Exception {
+        if (fileToChunk.keySet().containsAll(DEMO_FILE_NAMES)) {
             return;
         }
 
-        byte[] fileBytes = Files.readAllBytes(resolveTestFilePath());
+        for (String fileName : DEMO_FILE_NAMES) {
+            seedDemoFile(fileName);
+        }
+    }
+
+    private void seedDemoFile(String fileName) throws Exception {
+        if (fileToChunk.containsKey(fileName)) {
+            return;
+        }
+
+        byte[] fileBytes = Files.readAllBytes(resolveDemoFilePath(fileName));
         List<byte[]> allChunks = new ArrayList<>();
-        for (int i = 0; i < fileBytes.length; i += TEST_FILE_CHUNK_SIZE) {
-            int end = Math.min(i + TEST_FILE_CHUNK_SIZE, fileBytes.length);
+        for (int i = 0; i < fileBytes.length; i += DEMO_FILE_CHUNK_SIZE) {
+            int end = Math.min(i + DEMO_FILE_CHUNK_SIZE, fileBytes.length);
             allChunks.add(Arrays.copyOfRange(fileBytes, i, end));
         }
 
-        if (allChunks.size() != TEST_FILE_CHUNK_COUNT) {
-            throw new IllegalStateException("Expected " + TEST_FILE_CHUNK_COUNT + " chunks for "
-                    + TEST_FILE_NAME + " but found " + allChunks.size());
+        if (allChunks.isEmpty()) {
+            throw new IllegalStateException("Demo file " + fileName + " is empty.");
         }
 
         Map<Integer, ByteString> chunkMap = new HashMap<>();
@@ -76,77 +87,74 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
             int chunkIndex = chunkIndices.get(i);
             chunkMap.put(chunkIndex, ByteString.copyFrom(allChunks.get(chunkIndex)));
         }
-        fileToChunk.put(TEST_FILE_NAME, chunkMap);
+
+        fileToChunk.put(fileName, chunkMap);
+        fileToChunkCount.put(fileName, allChunks.size());
+        System.out.println("Seeded " + seededChunkCount + "/" + allChunks.size()
+                + " chunks for " + fileName);
     }
 
-    private Path resolveTestFilePath() {
-        for (Path candidate : TEST_FILE_PATH_CANDIDATES) {
+    private Path resolveDemoFilePath(String fileName) {
+        for (Path candidate : List.of(Path.of(fileName), Path.of("peer", fileName))) {
             if (Files.exists(candidate)) {
                 return candidate;
             }
         }
 
-        throw new IllegalStateException("Could not find " + TEST_FILE_NAME
-                + " in " + Arrays.toString(TEST_FILE_PATH_CANDIDATES));
+        throw new IllegalStateException("Could not find " + fileName + " in current directory or peer/");
     }
 
     @Override
     // receive FileRequest from client. send back chunkBitmap
     public void getAvailability(FileRequest request, StreamObserver<ChunkBitmap> responseObserver) {
         try {
-            seedTestFile();
+            seedDemoFiles();
         } catch (Exception e) {
             responseObserver.onError(Status.INTERNAL
-                    .withDescription("Failed to seed test file: " + e.getMessage())
+                    .withDescription("Failed to seed demo files: " + e.getMessage())
                     .asRuntimeException());
             return;
         }
 
         String fileName = request.getFileId();
-        ChunkBitmap newBitMap;
-        int chunks = TEST_FILE_CHUNK_COUNT;
+        Integer chunks = fileToChunkCount.get(fileName);
 
-        // For now assume we only have file "Test.bin", any other file request should be
-        // rejected
-        if (!fileName.equals(TEST_FILE_NAME)) {
-            ByteString value = ByteString.EMPTY;
-            newBitMap = ChunkBitmap.newBuilder()
-                    .setFileId(fileName)
-                    .setNumChunks(chunks)
-                    .setBitset(value)
-                    .build();
-        } else {
-            Map<Integer, ByteString> chunkMap = fileToChunk.getOrDefault(fileName, Map.of());
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-            int currentByte = 0;
-            int bitCount = 0;
-
-            for (int i = 0; i < chunks; i++) {
-                int idx = chunks - i - 1; // chunk (chunks-1) ... chunk 0
-                int bit = chunkMap.containsKey(idx) ? 1 : 0;
-
-                currentByte = (currentByte << 1) | bit;
-                bitCount++;
-
-                if (bitCount == 8) {
-                    out.write(currentByte);
-                    currentByte = 0;
-                    bitCount = 0;
-                }
-            }
-            if (bitCount > 0) {
-                currentByte <<= (8 - bitCount); // pad remaining bits on the right
-                out.write(currentByte);
-            }
-
-            ByteString value = ByteString.copyFrom(out.toByteArray());
-            newBitMap = ChunkBitmap.newBuilder()
-                    .setFileId(fileName)
-                    .setNumChunks(chunks)
-                    .setBitset(value)
-                    .build();
+        if (chunks == null) {
+            responseObserver.onError(Status.NOT_FOUND
+                    .withDescription("No chunks tracked for file_id=" + fileName)
+                    .asRuntimeException());
+            return;
         }
+
+        Map<Integer, ByteString> chunkMap = fileToChunk.getOrDefault(fileName, Map.of());
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        int currentByte = 0;
+        int bitCount = 0;
+
+        for (int i = 0; i < chunks; i++) {
+            int idx = chunks - i - 1; // chunk (chunks-1) ... chunk 0
+            int bit = chunkMap.containsKey(idx) ? 1 : 0;
+
+            currentByte = (currentByte << 1) | bit;
+            bitCount++;
+
+            if (bitCount == 8) {
+                out.write(currentByte);
+                currentByte = 0;
+                bitCount = 0;
+            }
+        }
+        if (bitCount > 0) {
+            currentByte <<= (8 - bitCount); // pad remaining bits on the right
+            out.write(currentByte);
+        }
+
+        ChunkBitmap newBitMap = ChunkBitmap.newBuilder()
+                .setFileId(fileName)
+                .setNumChunks(chunks)
+                .setBitset(ByteString.copyFrom(out.toByteArray()))
+                .build();
 
         responseObserver.onNext(newBitMap);
         responseObserver.onCompleted();
@@ -190,6 +198,8 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
     @Scheduled(fixedRate = 5000)
     public void sendHeartbeat() {
         try {
+            seedDemoFiles();
+
             PeerEndpoint peerEndpoint = PeerEndpoint.newBuilder()
                     .setId(id)
                     .setIp("127.0.0.1")
@@ -202,7 +212,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase { // "Test.bin", 10, 
                     .build();
 
             HeartbeatResponse response = trackerStub.handleHeartbeatRequest(heartbeatRequest);
-            if(id.equals("-1")){
+            if (id.equals("-1")) {
                 id = response.getPeerId();
                 System.out.println(response.getPeerId());
             }
