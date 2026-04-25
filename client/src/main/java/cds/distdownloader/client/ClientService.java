@@ -34,6 +34,7 @@ public class ClientService {
     private final int trackerPort;
     private final String manifestPath;
     private final String requestedFilename;
+    private final Map<String, ManagedChannel> peerChannelCache = new ConcurrentHashMap<>();
 
     public ClientService(String trackerHost, int trackerPort, String manifestPath, String requestedFilename) {
         this.trackerHost = trackerHost;
@@ -80,15 +81,43 @@ public class ClientService {
                 throw new IllegalArgumentException("Manifest must contain at least one chunk.");
             }
 
-            Map<Integer, List<PeerEndpoint>> chunkToPeer = new HashMap<>();
-            for (PeerEndpoint peer : peers) {
-                collectAvailability(fileId, peer, chunkToPeer);
-            }
+            Map<Integer, List<PeerEndpoint>> chunkToPeer = Collections.synchronizedMap(new HashMap<>());
+            collectAvailabilityParallel(fileId, peers, chunkToPeer);
 
             downloadChunks(fileId, manifest, peers, chunkToPeer);
             printSpeedSummary(manifest, startNanos);
         } finally {
             trackerChannel.shutdown();
+            shutdownChannels();
+        }
+    }
+
+    private void collectAvailabilityParallel(
+            String fileId,
+            List<PeerEndpoint> peers,
+            Map<Integer, List<PeerEndpoint>> chunkToPeer
+    ) throws IOException {
+        int threadCount = Math.min(peers.size(), 16);  // Limit threads for connection pooling
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+        try {
+            List<Future<?>> futures = new ArrayList<>();
+            for (PeerEndpoint peer : peers) {
+                futures.add(executor.submit(() -> collectAvailability(fileId, peer, chunkToPeer)));
+            }
+
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Availability collection interrupted", e);
+                } catch (Exception e) {
+                    System.err.println("Failed to collect availability from peer: " + e.getMessage());
+                }
+            }
+        } finally {
+            executor.shutdown();
         }
     }
 
@@ -110,12 +139,13 @@ public class ClientService {
             );
 
             Set<Integer> availableChunks = parseBitmap(bitmap.getBitset(), bitmap.getNumChunks());
-            System.out.println("availableChunks = " + availableChunks);
+            System.out.println("Peer " + peer.getIp() + ":" + peer.getPort() + " has chunks: " + availableChunks);
 
             for (Integer chunkIdx : availableChunks) {
-                chunkToPeer.computeIfAbsent(chunkIdx, k -> new ArrayList<>()).add(peer);
-                System.out.println("I just got " + chunkIdx + " from " + peer.getIp() + ":" + peer.getPort());
+                chunkToPeer.computeIfAbsent(chunkIdx, k -> Collections.synchronizedList(new ArrayList<>())).add(peer);
             }
+        } catch (Exception e) {
+            System.err.println("Error querying peer " + peer.getIp() + ":" + peer.getPort() + ": " + e.getMessage());
         } finally {
             peerChannel.shutdown();
         }
@@ -193,21 +223,17 @@ public class ClientService {
 
         for (int attempt = 0; attempt < owners.size(); attempt++) {
             PeerEndpoint peer = owners.get((start + attempt) % owners.size());
-
-            ManagedChannel peerChannel = ManagedChannelBuilder
-                    .forAddress(peer.getIp(), peer.getPort())
-                    .usePlaintext()
-                    .build();
+            String peerKey = peer.getIp() + ":" + peer.getPort();
 
             try {
+                ManagedChannel peerChannel = getOrCreateChannel(peer);
                 PeerGrpc.PeerBlockingStub peerStub = PeerGrpc.newBlockingStub(peerChannel);
                 ChunkRef request = ChunkRef.newBuilder()
                         .setFileId(fileId)
                         .setChunkIndex(chunkIdx)
                         .build();
 
-                System.out.println("Requesting chunk " + chunkIdx + " from "
-                        + peer.getIp() + ":" + peer.getPort());
+                System.out.println("Requesting chunk " + chunkIdx + " from " + peerKey);
 
                 ChunkResponse response = peerStub.getChunk(
                         ChunkRequest.newBuilder()
@@ -216,18 +242,33 @@ public class ClientService {
                 );
 
                 downloadedChunks.put(chunkIdx, response.getData().toByteArray());
-                System.out.println("Downloaded chunk " + chunkIdx + " from "
-                        + peer.getIp() + ":" + peer.getPort());
+                System.out.println("Downloaded chunk " + chunkIdx + " from " + peerKey);
                 return;
             } catch (Exception e) {
                 lastError = e;
-            } finally {
-                peerChannel.shutdown();
+                System.err.println("Failed to get chunk " + chunkIdx + " from " + peerKey + ": " + e.getMessage());
             }
         }
 
         failedChunks.add("Chunk " + chunkIdx + " failed from all owners"
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
+    }
+
+    private ManagedChannel getOrCreateChannel(PeerEndpoint peer) {
+        String peerKey = peer.getIp() + ":" + peer.getPort();
+        return peerChannelCache.computeIfAbsent(peerKey, k ->
+                ManagedChannelBuilder
+                        .forAddress(peer.getIp(), peer.getPort())
+                        .usePlaintext()
+                        .build()
+        );
+    }
+
+    private void shutdownChannels() {
+        for (ManagedChannel channel : peerChannelCache.values()) {
+            channel.shutdown();
+        }
+        peerChannelCache.clear();
     }
 
     private void assembleFile(Map<Integer, byte[]> downloadedChunks, FileManifest manifest) throws IOException {
