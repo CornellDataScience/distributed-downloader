@@ -7,26 +7,29 @@ When multiple machines on the same LAN need the same file, peers can share chunk
 ## Current Architecture (Plan A)
 
 1. **Tracker** (`tracker/`, Spring Boot + gRPC)
-- Tracks peer liveness only (`peer_id`, `ip`, `port`, `last_seen`)
-- RPCs: `Register`, `Heartbeat`, `ListPeers`
-- No tracker-side chunk availability yet
+- Tracks peer liveness (`peer_id`, `ip`, `port`, `last_seen`)
+- Tracks which file IDs each peer advertises in memory
+- RPCs: `Heartbeat`, `ListPeers`
 
 2. **Peer** (`peer/`, Spring Boot + gRPC)
 - Serves chunk availability and chunk bytes
 - RPCs: `GetAvailability(file_id)`, `GetChunk(file_id, chunk_index)`
+- Current implementation is demo-oriented around `Test.bin`
 
-3. **Client** (in progress)
+3. **Client** (`client/`, standalone Maven module)
 - Loads manifest
 - Asks tracker for live peers
 - Fetches availability bitmap from peers
-- Downloads chunks in parallel and verifies SHA-256
-- Falls back to origin when needed
+- Downloads chunks in parallel
+- Assembles the downloaded chunks into an output file
+- SHA-256 verification and origin fallback are still planned
 
 ## Repo Structure
 
 - `proto/` - Protobuf definitions + generated gRPC Java classes
 - `tracker/` - Tracker service
 - `peer/` - Peer service
+- `client/` - CLI-style client used to download and assemble chunks
 - `env/` - local sample files/notes
 
 ## Protobuf Notes
@@ -37,6 +40,7 @@ When multiple machines on the same LAN need the same file, peers can share chunk
     - `common.proto`
     - `tracker.proto`
     - `peer.proto`
+    - `client.proto`
 
 ## Prerequisites
 
@@ -45,10 +49,16 @@ When multiple machines on the same LAN need the same file, peers can share chunk
 
 ## Build
 
-From repo root:
+From repo root, build the reactor modules (`proto`, `tracker`, `peer`):
 
 ```bash
-mvn clean install
+mvn -DskipTests clean install
+```
+
+The client is currently built as a separate Maven project:
+
+```bash
+mvn -f client/pom.xml -DskipTests compile
 ```
 
 Useful module-specific builds:
@@ -62,6 +72,9 @@ mvn -pl peer -am clean compile
 
 # Compile tracker with reactor dependencies
 mvn -pl tracker -am clean compile
+
+# Compile client
+mvn -f client/pom.xml -DskipTests compile
 ```
 
 ## Run Services
@@ -83,7 +96,7 @@ Also at repo root, leverage MakeFile:
 make t
 
 # Run peer
-make p
+make peer PORT=7003
 
 # Run client
 make c
@@ -122,8 +135,10 @@ After building `proto`:
 ## Current MVP Status
 
 - Proto contracts are defined for Tracker and Peer services
-- Spring gRPC scaffolding is present in tracker and peer modules
-- Tracker/Peer business logic is still being implemented (MVP phase)
+- Tracker stores live peer endpoints and advertised file IDs in memory
+- Peer serves demo chunk availability and chunk bytes for `Test.bin`
+- Client can query peers, download advertised chunks in parallel, and assemble the file
+- Hash verification, origin fallback, persistent storage, and general file indexing are not implemented yet
 
 ## Team
 
