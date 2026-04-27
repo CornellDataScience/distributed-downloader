@@ -10,6 +10,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
+import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class PeerGrpcService extends PeerGrpc.PeerImplBase {
@@ -36,7 +38,9 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
     private final Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
     private final Map<String, Integer> fileToChunkCount = new HashMap<>();
     private final Random random = new Random();
+    private final ManagedChannel trackerChannel;
     private final TrackerGrpc.TrackerBlockingStub trackerStub;
+    private final boolean quiet;
 
     @Value("${peer.port:6001}")
     private int port = 6001;
@@ -49,13 +53,41 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
      * Creates peer that connects to tracker at IP address
      * `trackerAddress`:`trackerPort`. Default address is localhost:50051.
      */
-    public PeerGrpcService(@Value("${tracker.address:localhost}") String trackerAddress,
-            @Value("${tracker.port:50051}") int trackerPort) {
-        ManagedChannel channel = ManagedChannelBuilder
+    public PeerGrpcService(
+            @Value("${tracker.address:localhost}") String trackerAddress,
+            @Value("${tracker.port:50051}") int trackerPort,
+            @Value("${cds.distdownloader.quiet:false}") boolean quiet
+    ) {
+        this.trackerChannel = ManagedChannelBuilder
                 .forAddress(trackerAddress, trackerPort)
                 .usePlaintext()
                 .build();
-        this.trackerStub = TrackerGrpc.newBlockingStub(channel);
+        this.trackerStub = TrackerGrpc.newBlockingStub(trackerChannel);
+        this.quiet = quiet;
+    }
+
+    private void info(String message) {
+        if (!quiet) {
+            System.out.println(message);
+        }
+    }
+
+    @PreDestroy
+    public void shutdownTrackerChannel() {
+        shutdownChannelGracefully(trackerChannel);
+    }
+
+    private static void shutdownChannelGracefully(ManagedChannel channel) {
+        channel.shutdown();
+        try {
+            if (!channel.awaitTermination(5, TimeUnit.SECONDS)) {
+                channel.shutdownNow();
+                channel.awaitTermination(1, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException e) {
+            channel.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     public synchronized void seedDemoFiles() throws Exception {
@@ -105,7 +137,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
 
         fileToChunk.put(fileName, chunkMap);
         fileToChunkCount.put(fileName, chunkCount);
-        System.out.println("Seeded " + chunkMap.size() + "/" + chunkCount
+        info("Seeded " + chunkMap.size() + "/" + chunkCount
                 + " chunks for " + fileName);
     }
 
@@ -226,7 +258,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
         ChunkResponse resp = ChunkResponse.newBuilder()
                 .setData(chunkBytes)
                 .build();
-        System.out.println("Sending");
+        info("Sending");
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -256,9 +288,9 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
             HeartbeatResponse response = trackerStub.handleHeartbeatRequest(heartbeatRequest);
             if (id.equals("-1")) {
                 id = response.getPeerId();
-                System.out.println(response.getPeerId());
+                info(response.getPeerId());
             }
-            System.out.println("Heartbeat sent. Ack = " + response.getAck().getOk() + "; ID: " + id);
+            info("Heartbeat sent. Ack = " + response.getAck().getOk() + "; ID: " + id);
         } catch (Exception e) {
             e.printStackTrace();
         }

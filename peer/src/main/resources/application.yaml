@@ -11,3 +11,8 @@ tracker:
 
 peer:
   advertise-address: 127.0.0.1
+
+# Benchmark / CI: set true to skip noisy stdout (or use -Dcds.distdownloader.quiet=true / --cds.distdownloader.quiet=true)
+cds:
+  distdownloader:
+    quiet: false
