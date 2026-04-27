@@ -1,22 +1,41 @@
 package cds.distdownloader.peer;
 
-import cds.distdownloader.proto.*;
-import com.google.protobuf.ByteString;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
-
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.*;
+import com.google.protobuf.ByteString;
+
+import cds.distdownloader.proto.ChunkBitmap;
+import cds.distdownloader.proto.ChunkRef;
+import cds.distdownloader.proto.ChunkRequest;
+import cds.distdownloader.proto.ChunkResponse;
+import cds.distdownloader.proto.FileManifestEntry;
+import cds.distdownloader.proto.FileRequest;
+import cds.distdownloader.proto.HeartbeatRequest;
+import cds.distdownloader.proto.HeartbeatResponse;
+import cds.distdownloader.proto.PeerEndpoint;
+import cds.distdownloader.proto.PeerGrpc;
+import cds.distdownloader.proto.TrackerGrpc;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.stub.StreamObserver;
+import jakarta.annotation.PreDestroy;
 
 @Service
 public class PeerGrpcService extends PeerGrpc.PeerImplBase {
@@ -36,7 +55,9 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
     private final Map<String, Map<Integer, ByteString>> fileToChunk = new HashMap<>();
     private final Map<String, Integer> fileToChunkCount = new HashMap<>();
     private final Random random = new Random();
+    private final ManagedChannel trackerChannel;
     private final TrackerGrpc.TrackerBlockingStub trackerStub;
+    private final boolean quiet;
 
     @Value("${peer.port:6001}")
     private int port = 6001;
@@ -49,13 +70,41 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
      * Creates peer that connects to tracker at IP address
      * `trackerAddress`:`trackerPort`. Default address is localhost:50051.
      */
-    public PeerGrpcService(@Value("${tracker.address:localhost}") String trackerAddress,
-            @Value("${tracker.port:50051}") int trackerPort) {
-        ManagedChannel channel = ManagedChannelBuilder
+    public PeerGrpcService(
+            @Value("${tracker.address:localhost}") String trackerAddress,
+            @Value("${tracker.port:50051}") int trackerPort,
+            @Value("${cds.distdownloader.quiet:false}") boolean quiet
+    ) {
+        this.trackerChannel = ManagedChannelBuilder
                 .forAddress(trackerAddress, trackerPort)
                 .usePlaintext()
                 .build();
-        this.trackerStub = TrackerGrpc.newBlockingStub(channel);
+        this.trackerStub = TrackerGrpc.newBlockingStub(trackerChannel);
+        this.quiet = quiet;
+    }
+
+    private void info(String message) {
+        if (!quiet) {
+            System.out.println(message);
+        }
+    }
+
+    @PreDestroy
+    public void shutdownTrackerChannel() {
+        shutdownChannelGracefully(trackerChannel);
+    }
+
+    private static void shutdownChannelGracefully(ManagedChannel channel) {
+        channel.shutdown();
+        try {
+            if (!channel.awaitTermination(5, TimeUnit.SECONDS)) {
+                channel.shutdownNow();
+                channel.awaitTermination(1, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException e) {
+            channel.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     // public synchronized void seedDemoFiles() throws Exception {
@@ -121,7 +170,8 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
     
         localManifest.put(fileName, manifestEntry);
     
-        System.out.println("Seeded " + chunkMap.size() + "/" + chunkCount
+        System.out.println("Seeded " + chunkMap.size() + "/" + chunkCount);
+        info("Seeded " + chunkMap.size() + "/" + chunkCount
                 + " chunks for " + fileName);
     }
 
@@ -283,7 +333,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
         ChunkResponse resp = ChunkResponse.newBuilder()
                 .setData(chunkBytes)
                 .build();
-        System.out.println("Sending");
+        info("Sending");
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -313,9 +363,9 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
             HeartbeatResponse response = trackerStub.handleHeartbeatRequest(heartbeatRequest);
             if (id.equals("-1")) {
                 id = response.getPeerId();
-                System.out.println(response.getPeerId());
+                info(response.getPeerId());
             }
-            System.out.println("Heartbeat sent. Ack = " + response.getAck().getOk() + "; ID: " + id);
+            info("Heartbeat sent. Ack = " + response.getAck().getOk() + "; ID: " + id);
         } catch (Exception e) {
             e.printStackTrace();
         }

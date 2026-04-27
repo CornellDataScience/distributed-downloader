@@ -1,24 +1,10 @@
 package cds.distdownloader.client;
 
-import cds.distdownloader.proto.ChunkBitmap;
-import cds.distdownloader.proto.ChunkRef;
-import cds.distdownloader.proto.ChunkRequest;
-import cds.distdownloader.proto.ChunkResponse;
-import cds.distdownloader.proto.FileRequest;
-import cds.distdownloader.proto.ListPeersRequest;
-import cds.distdownloader.proto.ListPeersResponse;
-import cds.distdownloader.proto.PeerEndpoint;
-import cds.distdownloader.proto.PeerGrpc;
-import cds.distdownloader.proto.TrackerGrpc;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.protobuf.ByteString;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,26 +14,47 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.protobuf.ByteString;
+
+import cds.distdownloader.proto.ChunkBitmap;
+import cds.distdownloader.proto.ChunkRef;
+import cds.distdownloader.proto.ChunkRequest;
+import cds.distdownloader.proto.ChunkResponse;
+import cds.distdownloader.proto.FileManifestEntry;
+import cds.distdownloader.proto.FileRequest;
 import cds.distdownloader.proto.GetFileManifestRequest;
 import cds.distdownloader.proto.GetFileManifestResponse;
-import cds.distdownloader.proto.FileManifestEntry;
+import cds.distdownloader.proto.ListPeersRequest;
+import cds.distdownloader.proto.ListPeersResponse;
+import cds.distdownloader.proto.PeerEndpoint;
+import cds.distdownloader.proto.PeerGrpc;
+import cds.distdownloader.proto.TrackerGrpc;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 
 public class ClientService {
     /** When {@link ClientConcurrencyConfig#maxDownloadParallelism()} is 0, use at least this many download threads. */
     private static final int DEFAULT_MIN_DOWNLOAD_THREADS = 32;
     /** When max download is 0, use this multiple of peer count (was 2, raised for less restriction). */
     private static final int DEFAULT_DOWNLOAD_THREADS_PER_PEER = 8;
+    /** Max missing chunk indices listed in the early availability warning (rest summarized). */
+    private static final int MISSING_CHUNK_WARNING_INDEX_CAP = 40;
 
     private final String trackerHost;
     private final int trackerPort;
     private final String manifestPath;
     private final String requestedFilename;
     private final ClientConcurrencyConfig concurrency;
+    private final boolean quiet;
     private final Map<String, ManagedChannel> peerChannelCache = new ConcurrentHashMap<>();
+    /** In-flight {@code getChunk} calls per peer for the current file download. */
+    private final ConcurrentHashMap<String, AtomicInteger> inflightDownloadsByPeer = new ConcurrentHashMap<>();
 
     public ClientService(String trackerHost, int trackerPort, String manifestPath, String requestedFilename) {
-        this(trackerHost, trackerPort, manifestPath, requestedFilename, ClientConcurrencyConfig.DEFAULT);
+        this(trackerHost, trackerPort, manifestPath, requestedFilename, ClientConcurrencyConfig.DEFAULT, false);
     }
 
     public ClientService(
@@ -57,17 +64,29 @@ public class ClientService {
             String requestedFilename,
             ClientConcurrencyConfig concurrency
     ) {
+        this(trackerHost, trackerPort, manifestPath, requestedFilename, concurrency, false);
+    }
+
+    public ClientService(
+            String trackerHost,
+            int trackerPort,
+            String manifestPath,
+            String requestedFilename,
+            ClientConcurrencyConfig concurrency,
+            boolean quiet
+    ) {
         this.trackerHost = trackerHost;
         this.trackerPort = trackerPort;
         this.manifestPath = manifestPath;
         this.requestedFilename = requestedFilename;
         this.concurrency = concurrency;
+        this.quiet = quiet;
     }
 
     public void start() {
-        System.out.println("trackerHost=" + trackerHost + ", trackerPort=" + trackerPort);
-        System.out.println("manifestPath=" + manifestPath);
-        System.out.println("requestedFilename=" + (requestedFilename == null ? "<default>" : requestedFilename));
+        info("trackerHost=" + trackerHost + ", trackerPort=" + trackerPort);
+        info("manifestPath=" + manifestPath);
+        info("requestedFilename=" + (requestedFilename == null ? "<default>" : requestedFilename));
 
         try {
             ManagedChannel trackerChannel = ManagedChannelBuilder
@@ -122,18 +141,19 @@ public class ClientService {
 
             int availabilityThreads = resolveAvailabilityThreadCount(peers.size());
             int downloadThreads = resolveDownloadThreadCount(numChunks, peers.size());
-            System.out.println("Parallelism: availabilityThreads=" + availabilityThreads
+            info("Parallelism: availabilityThreads=" + availabilityThreads
                     + ", downloadThreads=" + downloadThreads
                     + " (peers=" + peers.size() + ", chunks=" + numChunks + ")");
 
             Map<Integer, List<PeerEndpoint>> chunkToPeer = Collections.synchronizedMap(new HashMap<>());
             collectAvailabilityParallel(fileId, peers, chunkToPeer, availabilityThreads);
+            warnIfChunksMissingFromAvailability(numChunks, chunkToPeer);
 
             long networkDownloadNanos = downloadChunks(fileId, manifest, chunkToPeer, downloadThreads);
             printNetworkSpeedSummary(manifest, networkDownloadNanos);
             printSpeedSummary(manifest, startNanos);
         } finally {
-            trackerChannel.shutdown();
+            shutdownChannelGracefully(trackerChannel);
             shutdownChannels();
         }
     }
@@ -153,6 +173,36 @@ public class ClientService {
         // Default: allow more in-flight work than the old (2 × peers) cap.
         int derived = Math.max(DEFAULT_MIN_DOWNLOAD_THREADS, numPeers * DEFAULT_DOWNLOAD_THREADS_PER_PEER);
         return Math.max(1, Math.min(numChunks, derived));
+    }
+
+    private void warnIfChunksMissingFromAvailability(
+            int numChunks,
+            Map<Integer, List<PeerEndpoint>> chunkToPeer
+    ) {
+        List<Integer> missing = new ArrayList<>();
+        for (int i = 0; i < numChunks; i++) {
+            List<PeerEndpoint> owners = chunkToPeer.get(i);
+            if (owners == null || owners.isEmpty()) {
+                missing.add(i);
+            }
+        }
+        if (missing.isEmpty()) {
+            return;
+        }
+        int n = missing.size();
+        StringBuilder detail = new StringBuilder();
+        int show = Math.min(MISSING_CHUNK_WARNING_INDEX_CAP, n);
+        for (int j = 0; j < show; j++) {
+            if (j > 0) {
+                detail.append(", ");
+            }
+            detail.append(missing.get(j));
+        }
+        if (n > show) {
+            detail.append(", ... (").append(n).append(" total)");
+        }
+        System.err.println("WARNING: missing chunks detected — " + n
+                + " chunk(s) have no available peer. Indices: " + detail);
     }
 
     private void collectAvailabilityParallel(
@@ -198,13 +248,13 @@ public class ClientService {
             );
 
             Set<Integer> availableChunks = parseBitmap(bitmap.getBitset(), bitmap.getNumChunks());
-            System.out.println("Peer " + peer.getIp() + ":" + peer.getPort() + " has chunks: " + availableChunks);
+            info("Peer " + peerKey(peer) + " has chunks: " + availableChunks);
 
             for (Integer chunkIdx : availableChunks) {
                 chunkToPeer.computeIfAbsent(chunkIdx, k -> Collections.synchronizedList(new ArrayList<>())).add(peer);
             }
         } catch (Exception e) {
-            System.err.println("Error querying peer " + peer.getIp() + ":" + peer.getPort() + ": " + e.getMessage());
+            System.err.println("Error querying peer " + peerKey(peer) + ": " + e.getMessage());
         }
     }
 
@@ -215,6 +265,7 @@ public class ClientService {
             int threadCount
     ) throws IOException {
         int numChunks = manifest.getNumChunks();
+        inflightDownloadsByPeer.clear();
         Map<Integer, byte[]> downloadedChunks = new ConcurrentHashMap<>();
         List<Integer> missingChunks = Collections.synchronizedList(new ArrayList<>());
         List<String> failedChunks = Collections.synchronizedList(new ArrayList<>());
@@ -277,13 +328,16 @@ public class ClientService {
             return;
         }
 
-        int start = chunkIdx % owners.size();
+        List<PeerEndpoint> ownersSorted = new ArrayList<>(owners);
+        ownersSorted.sort(Comparator.comparing(PeerEndpoint::getIp).thenComparingInt(PeerEndpoint::getPort));
+        int startIdx = indexOfLeastInFlight(ownersSorted);
+
         Exception lastError = null;
-
-        for (int attempt = 0; attempt < owners.size(); attempt++) {
-            PeerEndpoint peer = owners.get((start + attempt) % owners.size());
-            String peerKey = peer.getIp() + ":" + peer.getPort();
-
+        for (int attempt = 0; attempt < ownersSorted.size(); attempt++) {
+            PeerEndpoint peer = ownersSorted.get((startIdx + attempt) % ownersSorted.size());
+            String key = peerKey(peer);
+            AtomicInteger inflight = inflightDownloadsByPeer.computeIfAbsent(key, k -> new AtomicInteger(0));
+            inflight.incrementAndGet();
             try {
                 ManagedChannel peerChannel = getOrCreateChannel(peer);
                 PeerGrpc.PeerBlockingStub peerStub = PeerGrpc.newBlockingStub(peerChannel);
@@ -292,7 +346,7 @@ public class ClientService {
                         .setChunkIndex(chunkIdx)
                         .build();
 
-                System.out.println("Requesting chunk " + chunkIdx + " from " + peerKey);
+                info("Requesting chunk " + chunkIdx + " from " + key);
 
                 ChunkResponse response = peerStub.getChunk(
                         ChunkRequest.newBuilder()
@@ -301,11 +355,13 @@ public class ClientService {
                 );
 
                 downloadedChunks.put(chunkIdx, response.getData().toByteArray());
-                System.out.println("Downloaded chunk " + chunkIdx + " from " + peerKey);
+                info("Downloaded chunk " + chunkIdx + " from " + key);
                 return;
             } catch (Exception e) {
                 lastError = e;
-                System.err.println("Failed to get chunk " + chunkIdx + " from " + peerKey + ": " + e.getMessage());
+                System.err.println("Failed to get chunk " + chunkIdx + " from " + key + ": " + e.getMessage());
+            } finally {
+                inflight.decrementAndGet();
             }
         }
 
@@ -313,9 +369,30 @@ public class ClientService {
                 + (lastError != null ? ": " + lastError.getMessage() : ""));
     }
 
+    private static String peerKey(PeerEndpoint peer) {
+        return peer.getIp() + ":" + peer.getPort();
+    }
+
+    private int inflightCount(PeerEndpoint peer) {
+        AtomicInteger n = inflightDownloadsByPeer.get(peerKey(peer));
+        return n == null ? 0 : n.get();
+    }
+
+    private int indexOfLeastInFlight(List<PeerEndpoint> sortedByAddress) {
+        int bestIdx = 0;
+        int minLoad = Integer.MAX_VALUE;
+        for (int i = 0; i < sortedByAddress.size(); i++) {
+            int load = inflightCount(sortedByAddress.get(i));
+            if (load < minLoad) {
+                minLoad = load;
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
+    }
+
     private ManagedChannel getOrCreateChannel(PeerEndpoint peer) {
-        String peerKey = peer.getIp() + ":" + peer.getPort();
-        return peerChannelCache.computeIfAbsent(peerKey, k ->
+        return peerChannelCache.computeIfAbsent(peerKey(peer), k ->
                 ManagedChannelBuilder
                         .forAddress(peer.getIp(), peer.getPort())
                         .usePlaintext()
@@ -325,9 +402,23 @@ public class ClientService {
 
     private void shutdownChannels() {
         for (ManagedChannel channel : peerChannelCache.values()) {
-            channel.shutdown();
+            shutdownChannelGracefully(channel);
         }
         peerChannelCache.clear();
+        inflightDownloadsByPeer.clear();
+    }
+
+    private static void shutdownChannelGracefully(ManagedChannel channel) {
+        channel.shutdown();
+        try {
+            if (!channel.awaitTermination(5, TimeUnit.SECONDS)) {
+                channel.shutdownNow();
+                channel.awaitTermination(1, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException e) {
+            channel.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void assembleFile(Map<Integer, byte[]> downloadedChunks, FileManifestEntry manifest) throws IOException {
@@ -345,7 +436,7 @@ public class ClientService {
             }
         }
 
-        System.out.println("File written to " + outputPath);
+        info("File written to " + outputPath);
     }
 
     private void printSpeedSummary(FileManifestEntry manifest, long startNanos) {
@@ -371,9 +462,10 @@ public class ClientService {
                 mibPerSecond);
     }
 
-    private FileManifestCatalog readManifestCatalog() throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.readValue(Path.of(manifestPath).toFile(), FileManifestCatalog.class);
+    private void info(String message) {
+        if (!quiet) {
+            System.out.println(message);
+        }
     }
 
     private Set<Integer> parseBitmap(ByteString bitset, int numChunks) {

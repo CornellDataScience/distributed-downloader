@@ -11,12 +11,12 @@ tracker:
 	mvn -pl proto -am -DskipTests install
 	mvn -pl tracker spring-boot:run -Dspring-boot.run.arguments="--spring.grpc.server.port=$(TRACKER_PORT)"
 
+# Optional: QUIET=true|false - suppress verbose stdout on client/peer (passes -D / Spring args).
 peer:
-	mvn -pl proto -am -DskipTests install
-	mvn -pl peer spring-boot:run -Dspring-boot.run.arguments="--peer.port=$(PEER_PORT) --tracker.address=$(TRACKER_HOST) --tracker.port=$(TRACKER_PORT) --peer.advertise-address=$(ADVERTISE_ADDRESS) --peer.share-file=$(SHARE_FILE)"
+	mvn -pl peer spring-boot:run -Dspring-boot.run.arguments="--peer.port=$(or $(PORT),6001)$(if $(QUIET), --cds.distdownloader.quiet=$(QUIET),)"
 
 client:
-	mvn -f client/pom.xml -DskipTests compile exec:java -Dexec.mainClass=cds.distdownloader.client.Client -Dexec.args="$(TRACKER_HOST) $(TRACKER_PORT) $(MANIFEST) $(FILE)"
+	mvn -f client/pom.xml -DskipTests compile exec:java -Dexec.mainClass=cds.distdownloader.client.Client $(if $(QUIET),-Dcds.distdownloader.quiet=$(QUIET),) -Dexec.args="$(or $(HOST),127.0.0.1) $(or $(TRACKER_PORT),50051) $(or $(MANIFEST),env/manifest.json) $(FILE)"
 
 proto:
 	mvn -pl proto -am -DskipTests install
