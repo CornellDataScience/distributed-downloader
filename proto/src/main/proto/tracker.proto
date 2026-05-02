@@ -16,6 +16,24 @@ message HeartbeatResponse {
   string peer_id = 2;
 }
 
+message GetFileManifestRequest {
+  string file_id = 1;
+}
+
+message GetFileManifestResponse {
+  FileManifestEntry file = 1;
+}
+
+//Peer sends final manifest entry to tracker
+message FileManifestEntry {
+  string filename = 1;
+  int64 filesize = 2;
+  int32 chunk_size = 3;
+  string origin = 4;
+  string hash_algorithm = 5;
+  int32 num_chunks = 6;
+}
+
 // Returns only currently-up peers (not expired by TTL).
 message ListPeersRequest {
   // empty: client sends request, tracker doesn't do anything
@@ -27,4 +45,5 @@ message ListPeersResponse {
 service Tracker {
   rpc HandleHeartbeatRequest(HeartbeatRequest) returns (HeartbeatResponse);
   rpc HandleListPeersRequest(ListPeersRequest) returns (ListPeersResponse);
+  rpc GetFileManifest(GetFileManifestRequest) returns (GetFileManifestResponse);
 }

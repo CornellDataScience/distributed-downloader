@@ -22,6 +22,8 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
     // fileId -> peerIds that advertise it
     private final Map<String, Set<String>> fileToPeers = new HashMap<>();
 
+    private final Map<String, FileManifestEntry> fileManifest = new HashMap<>();
+
     private int nextUUID = 0;
 
     @Override
@@ -49,7 +51,16 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
         peerToEndpoint.put(peerId, canonicalEndpoint);
         peerLastSeen.put(peerId, Instant.now());
 
-        Set<String> newFiles = new HashSet<>(request.getFileIdsList());
+        Set<String> newFiles = new HashSet<>();
+
+        for (FileManifestEntry file : request.getFilesList()) {
+            String fileId = file.getFilename();
+
+            newFiles.add(fileId);
+
+            // Store/update metadata for this file
+            fileManifest.put(fileId, file);
+        }
         Set<String> oldFiles = peerToFiles.getOrDefault(peerId, Collections.emptySet());
 
         // Remove peer from files it no longer serves
@@ -89,6 +100,28 @@ public class TrackerGrpcService extends TrackerGrpc.TrackerImplBase {
 
         ListPeersResponse response = ListPeersResponse.newBuilder()
                 .addAllUpPeers(peerToEndpoint.values())
+                .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public synchronized void getFileManifest(GetFileManifestRequest request, StreamObserver<GetFileManifestResponse> responseObserver) {
+        pruneDeadPeers();
+        FileManifestEntry manifest = fileManifest.get(request.getFileId());
+
+        if (manifest == null) {
+            responseObserver.onError(
+                    io.grpc.Status.NOT_FOUND
+                            .withDescription("No manifest found for file_id=" + request.getFileId())
+                            .asRuntimeException()
+            );
+            return;
+        }
+
+        GetFileManifestResponse response = GetFileManifestResponse.newBuilder()
+                .setFile(manifest)
                 .build();
 
         responseObserver.onNext(response);

@@ -29,6 +29,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import cds.distdownloader.proto.GetFileManifestRequest;
+import cds.distdownloader.proto.GetFileManifestResponse;
+import cds.distdownloader.proto.FileManifestEntry;
+
 public class ClientService {
     /** When {@link ClientConcurrencyConfig#maxDownloadParallelism()} is 0, use at least this many download threads. */
     private static final int DEFAULT_MIN_DOWNLOAD_THREADS = 32;
@@ -66,15 +70,33 @@ public class ClientService {
         System.out.println("requestedFilename=" + (requestedFilename == null ? "<default>" : requestedFilename));
 
         try {
-            FileManifest manifest = readManifestCatalog().findByFilename(requestedFilename);
-            getFile(manifest.filename(), manifest);
+            ManagedChannel trackerChannel = ManagedChannelBuilder
+                    .forAddress(trackerHost, trackerPort)
+                    .usePlaintext()
+                    .build();
+
+            try {
+                TrackerGrpc.TrackerBlockingStub trackerStub = TrackerGrpc.newBlockingStub(trackerChannel);
+
+                GetFileManifestResponse manifestResponse = trackerStub.getFileManifest(
+                        GetFileManifestRequest.newBuilder()
+                                .setFileId(requestedFilename)
+                                .build()
+                );
+
+                FileManifestEntry manifest = manifestResponse.getFile();
+
+                getFile(manifest.getFilename(), manifest);
+                } finally {
+                    trackerChannel.shutdown();
+                }
         } catch (Exception e) {
             System.err.println("Download failed, Error: " + e);
             e.printStackTrace();
         }
     }
 
-    public void getFile(String fileId, FileManifest manifest) throws IOException {
+    public void getFile(String fileId, FileManifestEntry manifest) throws IOException {
         long startNanos = System.nanoTime();
 
         ManagedChannel trackerChannel = ManagedChannelBuilder
@@ -93,7 +115,7 @@ public class ClientService {
                 throw new IllegalStateException("Tracker returned no live peers.");
             }
 
-            int numChunks = manifest.resolvedChunkCount();
+            int numChunks = manifest.getNumChunks();
             if (numChunks <= 0) {
                 throw new IllegalArgumentException("Manifest must contain at least one chunk.");
             }
@@ -187,11 +209,11 @@ public class ClientService {
 
     private void downloadChunks(
             String fileId,
-            FileManifest manifest,
+            FileManifestEntry manifest,
             Map<Integer, List<PeerEndpoint>> chunkToPeer,
             int threadCount
     ) throws IOException {
-        int numChunks = manifest.resolvedChunkCount();
+        int numChunks = manifest.getNumChunks();
         Map<Integer, byte[]> downloadedChunks = new ConcurrentHashMap<>();
         List<Integer> missingChunks = Collections.synchronizedList(new ArrayList<>());
         List<String> failedChunks = Collections.synchronizedList(new ArrayList<>());
@@ -304,13 +326,13 @@ public class ClientService {
         peerChannelCache.clear();
     }
 
-    private void assembleFile(Map<Integer, byte[]> downloadedChunks, FileManifest manifest) throws IOException {
-        Path outputPath = Path.of("client", manifest.filename());
+    private void assembleFile(Map<Integer, byte[]> downloadedChunks, FileManifestEntry manifest) throws IOException {
+        Path outputPath = Path.of("client", manifest.getFilename());
 
         java.nio.file.Files.createDirectories(outputPath.getParent());
 
         try (java.io.OutputStream out = java.nio.file.Files.newOutputStream(outputPath)) {
-            for (int i = 0; i < manifest.resolvedChunkCount(); i++) {
+            for (int i = 0; i < manifest.getNumChunks(); i++) {
                 byte[] chunk = downloadedChunks.get(i);
                 if (chunk == null) {
                     throw new IllegalStateException("Missing downloaded chunk " + i);
@@ -322,10 +344,10 @@ public class ClientService {
         System.out.println("File written to " + outputPath);
     }
 
-    private void printSpeedSummary(FileManifest manifest, long startNanos) {
+    private void printSpeedSummary(FileManifestEntry manifest, long startNanos) {
         long elapsedNanos = System.nanoTime() - startNanos;
         double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
-        double mib = manifest.filesize() / (1024.0 * 1024.0);
+        double mib = manifest.getFilesize() / (1024.0 * 1024.0);
         double mibPerSecond = elapsedSeconds == 0 ? 0 : mib / elapsedSeconds;
 
         System.out.printf("Downloaded %.2f MiB in %.2f seconds (%.2f MiB/s)%n",

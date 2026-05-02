@@ -20,16 +20,16 @@ import java.util.*;
 
 @Service
 public class PeerGrpcService extends PeerGrpc.PeerImplBase {
-    private record DemoFile(String fileName, int chunkSize) {
-    }
 
-    private static final int ONE_MIB = 1024 * 1024;
-    private static final List<DemoFile> DEMO_FILES = List.of(
-            new DemoFile("Test.bin", ONE_MIB),
-            new DemoFile("Test1mb.bin", ONE_MIB),
-            new DemoFile("Test100mb.bin", ONE_MIB),
-            new DemoFile("Test1gb.bin", 1_000_000)
-    );
+    private static final int DEFAULT_CHUNK_SIZE = 1024 * 1024;
+    private static final String HASH_ALGORITHM = "SHA-256";
+
+    // run with --peer.share-file=/Users/you/Desktop/Test1mb.bin
+    @Value("${peer.share-file:}")
+    private String shareFilePath;
+
+    // filename -> manifest metadata for files this peer serves
+    private final Map<String, FileManifestEntry> localManifest = new HashMap<>();
 
     private String id = "-1";
     // filename -> (chunkbit -> bytes)
@@ -58,56 +58,113 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
         this.trackerStub = TrackerGrpc.newBlockingStub(channel);
     }
 
-    public synchronized void seedDemoFiles() throws Exception {
-        if (fileToChunk.keySet().containsAll(demoFileNames())) {
+    // public synchronized void seedDemoFiles() throws Exception {
+    //     if (fileToChunk.keySet().containsAll(demoFileNames())) {
+    //         return;
+    //     }
+
+    //     for (DemoFile demoFile : DEMO_FILES) {
+    //         seedDemoFile(demoFile);
+    //     }
+    // }
+
+    public synchronized void seedSharedFile() throws Exception {
+        if (shareFilePath == null || shareFilePath.isBlank()) {
             return;
         }
-
-        for (DemoFile demoFile : DEMO_FILES) {
-            seedDemoFile(demoFile);
+    
+        Path filePath = Path.of(shareFilePath);
+    
+        if (!Files.exists(filePath)) {
+            throw new IllegalStateException("Shared file does not exist: " + shareFilePath);
         }
-    }
-
-    private static List<String> demoFileNames() {
-        return DEMO_FILES.stream()
-                .map(DemoFile::fileName)
-                .toList();
-    }
-
-    private void seedDemoFile(DemoFile demoFile) throws Exception {
-        String fileName = demoFile.fileName();
+    
+        String fileName = filePath.getFileName().toString();
+    
         if (fileToChunk.containsKey(fileName)) {
             return;
         }
-
-        Path filePath = resolveDemoFilePath(fileName);
+    
         long fileSize = Files.size(filePath);
-        if (fileSize == 0) {
-            throw new IllegalStateException("Demo file " + fileName + " is empty.");
-        }
-
-        int chunkCount = (int) ((fileSize + demoFile.chunkSize() - 1) / demoFile.chunkSize());
-        Set<Integer> selectedChunks = selectRandomChunks(chunkCount);
+    
+        int chunkSize = DEFAULT_CHUNK_SIZE;
+        int chunkCount = (int) ((fileSize + chunkSize - 1) / chunkSize);
+    
         Map<Integer, ByteString> chunkMap = new HashMap<>();
-
+    
         try (InputStream input = Files.newInputStream(filePath)) {
-            byte[] buffer = new byte[demoFile.chunkSize()];
+            byte[] buffer = new byte[chunkSize];
+    
             for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
                 int bytesRead = readChunk(input, buffer);
+    
                 if (bytesRead == -1) {
                     break;
                 }
-                if (selectedChunks.contains(chunkIndex)) {
-                    chunkMap.put(chunkIndex, ByteString.copyFrom(buffer, 0, bytesRead));
-                }
+    
+                // Since this peer is sharing the original file, it should have all chunks.
+                chunkMap.put(chunkIndex, ByteString.copyFrom(buffer, 0, bytesRead));
             }
         }
-
+    
         fileToChunk.put(fileName, chunkMap);
         fileToChunkCount.put(fileName, chunkCount);
+    
+        FileManifestEntry manifestEntry = FileManifestEntry.newBuilder()
+                .setFilename(fileName)
+                .setFilesize(fileSize)
+                .setChunkSize(chunkSize)
+                .setOrigin(filePath.toString())
+                .setHashAlgorithm(HASH_ALGORITHM)
+                .setNumChunks(chunkCount)
+                .build();
+    
+        localManifest.put(fileName, manifestEntry);
+    
         System.out.println("Seeded " + chunkMap.size() + "/" + chunkCount
                 + " chunks for " + fileName);
     }
+
+    // private static List<String> demoFileNames() {
+    //     return DEMO_FILES.stream()
+    //             .map(DemoFile::fileName)
+    //             .toList();
+    // }
+
+    // private void seedDemoFile(DemoFile demoFile) throws Exception {
+    //     String fileName = demoFile.fileName();
+    //     if (fileToChunk.containsKey(fileName)) {
+    //         return;
+    //     }
+
+    //     Path filePath = resolveDemoFilePath(fileName);
+    //     long fileSize = Files.size(filePath);
+    //     if (fileSize == 0) {
+    //         throw new IllegalStateException("Demo file " + fileName + " is empty.");
+    //     }
+
+    //     int chunkCount = (int) ((fileSize + demoFile.chunkSize() - 1) / demoFile.chunkSize());
+    //     Set<Integer> selectedChunks = selectRandomChunks(chunkCount);
+    //     Map<Integer, ByteString> chunkMap = new HashMap<>();
+
+    //     try (InputStream input = Files.newInputStream(filePath)) {
+    //         byte[] buffer = new byte[demoFile.chunkSize()];
+    //         for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+    //             int bytesRead = readChunk(input, buffer);
+    //             if (bytesRead == -1) {
+    //                 break;
+    //             }
+    //             if (selectedChunks.contains(chunkIndex)) {
+    //                 chunkMap.put(chunkIndex, ByteString.copyFrom(buffer, 0, bytesRead));
+    //             }
+    //         }
+    //     }
+
+    //     fileToChunk.put(fileName, chunkMap);
+    //     fileToChunkCount.put(fileName, chunkCount);
+    //     System.out.println("Seeded " + chunkMap.size() + "/" + chunkCount
+    //             + " chunks for " + fileName);
+    // }
 
     private Set<Integer> selectRandomChunks(int chunkCount) {
         int seededChunkCount = random.nextInt(chunkCount) + 1;
@@ -136,21 +193,21 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
         return totalRead;
     }
 
-    private Path resolveDemoFilePath(String fileName) {
-        for (Path candidate : List.of(Path.of(fileName), Path.of("peer", fileName))) {
-            if (Files.exists(candidate)) {
-                return candidate;
-            }
-        }
+    // private Path resolveDemoFilePath(String fileName) {
+    //     for (Path candidate : List.of(Path.of(fileName), Path.of("peer", fileName))) {
+    //         if (Files.exists(candidate)) {
+    //             return candidate;
+    //         }
+    //     }
 
-        throw new IllegalStateException("Could not find " + fileName + " in current directory or peer/");
-    }
+    //     throw new IllegalStateException("Could not find " + fileName + " in current directory or peer/");
+    // }
 
     @Override
     // receive FileRequest from client. send back chunkBitmap
     public void getAvailability(FileRequest request, StreamObserver<ChunkBitmap> responseObserver) {
         try {
-            seedDemoFiles();
+            seedSharedFile();
         } catch (Exception e) {
             responseObserver.onError(Status.INTERNAL
                     .withDescription("Failed to seed demo files: " + e.getMessage())
@@ -240,7 +297,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
     @Scheduled(fixedRate = 5000)
     public void sendHeartbeat() {
         try {
-            seedDemoFiles();
+            seedSharedFile();
 
             PeerEndpoint peerEndpoint = PeerEndpoint.newBuilder()
                     .setId(id)
@@ -250,7 +307,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
 
             HeartbeatRequest heartbeatRequest = HeartbeatRequest.newBuilder()
                     .setEndpoint(peerEndpoint)
-                    .addAllFileIds(fileToChunk.keySet())
+                    .addAllFiles(localManifest.values())
                     .build();
 
             HeartbeatResponse response = trackerStub.handleHeartbeatRequest(heartbeatRequest);
