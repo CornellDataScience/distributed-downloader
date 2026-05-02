@@ -41,7 +41,7 @@ import jakarta.annotation.PreDestroy;
 @Service
 public class PeerGrpcService extends PeerGrpc.PeerImplBase {
 
-    private static final int DEFAULT_CHUNK_SIZE = 1024 * 1024;
+    private static final int DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024;
     private static final String HASH_ALGORITHM = "SHA-256";
 
     // run with --peer.share-file=/Users/you/Desktop/Test1mb.bin

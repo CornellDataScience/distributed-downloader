@@ -1,10 +1,12 @@
 package cds.distdownloader.client;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -38,10 +40,15 @@ import cds.distdownloader.proto.PeerGrpc;
 import cds.distdownloader.proto.TrackerGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 
 public class ClientService {
-    /** Max missing chunk indices listed in the early availability warning (rest summarized). */
     private static final int MISSING_CHUNK_WARNING_INDEX_CAP = 40;
+    /** Concurrent GetChunks streams opened per peer. Each gets its own HTTP/2 stream. */
+    private static final int STREAMS_PER_PEER = 4;
+    /** HTTP/2 receive window advertised to each peer — allows many chunks in-flight at once. */
+    private static final int FLOW_CONTROL_WINDOW = 64 * 1024 * 1024;
+    private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
     private final String trackerHost;
     private final int trackerPort;
@@ -244,9 +251,9 @@ public class ClientService {
     }
 
     /**
-     * Distributes chunks across peers (least-assigned-so-far), then fires one
-     * streaming GetChunks RPC per peer in parallel — one HTTP/2 stream per peer
-     * instead of one stream per chunk.
+     * Assigns chunks to peers (least-assigned-so-far), then opens up to STREAMS_PER_PEER
+     * concurrent GetChunks streams per peer. Each stream writes directly to the output
+     * FileChannel at the correct offset, so no in-memory assembly pass is needed.
      */
     private long downloadChunks(
             String fileId,
@@ -254,7 +261,7 @@ public class ClientService {
             Map<Integer, List<PeerEndpoint>> chunkToPeer
     ) throws IOException {
         int numChunks = manifest.getNumChunks();
-        Map<Integer, ByteString> downloadedChunks = new ConcurrentHashMap<>();
+        long chunkSize = manifest.getChunkSize();
         List<Integer> missingChunks = Collections.synchronizedList(new ArrayList<>());
         List<String> failedChunks = Collections.synchronizedList(new ArrayList<>());
 
@@ -264,39 +271,63 @@ public class ClientService {
             throw new IllegalStateException("Missing peers for chunks " + missingChunks);
         }
 
-        info("Streaming from " + peerToChunks.size() + " peer(s)");
-        ExecutorService executor = Executors.newFixedThreadPool(peerToChunks.size());
+        Path outputPath = Path.of("client", manifest.getFilename());
+        Files.createDirectories(outputPath.getParent());
 
-        try {
-            long networkStartNanos = System.nanoTime();
-            List<Future<?>> futures = new ArrayList<>();
-            for (Map.Entry<PeerEndpoint, List<Integer>> entry : peerToChunks.entrySet()) {
-                PeerEndpoint peer = entry.getKey();
-                List<Integer> chunks = new ArrayList<>(entry.getValue());
-                futures.add(executor.submit(() ->
-                        downloadChunksFromPeer(fileId, peer, chunks, chunkToPeer, downloadedChunks, failedChunks)));
+        try (FileChannel fileChannel = FileChannel.open(outputPath,
+                StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+
+            // Pre-allocate so concurrent positional writes land in a correctly-sized file
+            if (manifest.getFilesize() > 0) {
+                fileChannel.write(ByteBuffer.wrap(new byte[1]), manifest.getFilesize() - 1);
             }
 
-            for (Future<?> future : futures) {
-                try {
-                    future.get();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new IOException("Download interrupted", e);
-                } catch (Exception e) {
-                    throw new IOException("Parallel download failed", e);
+            int totalStreams = peerToChunks.values().stream()
+                    .mapToInt(c -> Math.min(STREAMS_PER_PEER, c.size()))
+                    .sum();
+            info("Streaming from " + peerToChunks.size() + " peer(s), " + totalStreams + " streams total");
+            ExecutorService executor = Executors.newFixedThreadPool(totalStreams);
+
+            try {
+                long networkStartNanos = System.nanoTime();
+                List<Future<?>> futures = new ArrayList<>();
+
+                for (Map.Entry<PeerEndpoint, List<Integer>> entry : peerToChunks.entrySet()) {
+                    PeerEndpoint peer = entry.getKey();
+                    List<Integer> chunks = new ArrayList<>(entry.getValue());
+                    int n = Math.min(STREAMS_PER_PEER, chunks.size());
+                    int batchSize = (chunks.size() + n - 1) / n;
+                    for (int i = 0; i < n; i++) {
+                        int from = i * batchSize;
+                        int to = Math.min(from + batchSize, chunks.size());
+                        List<Integer> batch = new ArrayList<>(chunks.subList(from, to));
+                        futures.add(executor.submit(() ->
+                                downloadChunksFromPeer(fileId, peer, batch, chunkToPeer,
+                                        fileChannel, chunkSize, failedChunks)));
+                    }
                 }
-            }
-            long networkDownloadNanos = System.nanoTime() - networkStartNanos;
 
-            if (!failedChunks.isEmpty()) {
-                throw new IllegalStateException("Some chunks failed: " + failedChunks);
-            }
+                for (Future<?> future : futures) {
+                    try {
+                        future.get();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Download interrupted", e);
+                    } catch (Exception e) {
+                        throw new IOException("Parallel download failed", e);
+                    }
+                }
+                long networkDownloadNanos = System.nanoTime() - networkStartNanos;
 
-            assembleFile(downloadedChunks, manifest);
-            return networkDownloadNanos;
-        } finally {
-            executor.shutdown();
+                if (!failedChunks.isEmpty()) {
+                    throw new IllegalStateException("Some chunks failed: " + failedChunks);
+                }
+
+                info("File written to " + outputPath);
+                return networkDownloadNanos;
+            } finally {
+                executor.shutdown();
+            }
         }
     }
 
@@ -328,16 +359,17 @@ public class ClientService {
     }
 
     /**
-     * Opens a single GetChunks streaming RPC for all chunks assigned to this peer.
-     * Falls back to individual GetChunk calls on alternate peers for any chunk
-     * not received from the stream.
+     * Opens one GetChunks streaming RPC for the given batch and writes each chunk
+     * directly to the FileChannel at offset (chunkIndex * chunkSize). Falls back to
+     * individual GetChunk calls on alternate peers for anything not received.
      */
     private void downloadChunksFromPeer(
             String fileId,
             PeerEndpoint peer,
             List<Integer> chunkIndices,
             Map<Integer, List<PeerEndpoint>> chunkToPeer,
-            Map<Integer, ByteString> downloadedChunks,
+            FileChannel fileChannel,
+            long chunkSize,
             List<String> failedChunks
     ) {
         String key = peerKey(peer);
@@ -351,10 +383,13 @@ public class ClientService {
             Iterator<ChunkResponse> stream = getOrCreateStub(peer).getChunks(request);
             while (stream.hasNext()) {
                 ChunkResponse resp = stream.next();
-                downloadedChunks.put(resp.getChunkIndex(), resp.getData());
+                writeChunk(fileChannel, chunkSize, resp.getChunkIndex(),
+                        resp.getData().asReadOnlyByteBuffer());
                 received.add(resp.getChunkIndex());
                 info("Downloaded chunk " + resp.getChunkIndex() + " from " + key);
             }
+        } catch (UncheckedIOException e) {
+            throw e;  // disk write error — don't retry on other peers
         } catch (Exception e) {
             System.err.println("Batch stream from " + key + " failed: " + e.getMessage());
         }
@@ -373,10 +408,12 @@ public class ClientService {
                                             .setChunkIndex(idx)
                                             .build())
                                     .build());
-                    downloadedChunks.put(idx, resp.getData());
+                    writeChunk(fileChannel, chunkSize, idx, resp.getData().asReadOnlyByteBuffer());
                     recovered = true;
                     info("Recovered chunk " + idx + " from fallback " + peerKey(fallback));
                     break;
+                } catch (UncheckedIOException e) {
+                    throw e;
                 } catch (Exception ex) {
                     // try next fallback
                 }
@@ -387,15 +424,29 @@ public class ClientService {
         }
     }
 
+    /** Writes buf to fc at the correct offset for chunkIndex; handles partial writes. */
+    private static void writeChunk(FileChannel fc, long chunkSize, int chunkIndex, ByteBuffer buf) {
+        try {
+            long pos = (long) chunkIndex * chunkSize;
+            while (buf.hasRemaining()) {
+                pos += fc.write(buf, pos);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to write chunk " + chunkIndex, e);
+        }
+    }
+
     private static String peerKey(PeerEndpoint peer) {
         return peer.getIp() + ":" + peer.getPort();
     }
 
     private PeerConnection getOrCreateConnection(PeerEndpoint peer) {
         return peerConnectionCache.computeIfAbsent(peerKey(peer), k -> {
-            ManagedChannel ch = ManagedChannelBuilder
+            ManagedChannel ch = NettyChannelBuilder
                     .forAddress(peer.getIp(), peer.getPort())
                     .usePlaintext()
+                    .flowControlWindow(FLOW_CONTROL_WINDOW)
+                    .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE)
                     .build();
             return new PeerConnection(ch, PeerGrpc.newBlockingStub(ch));
         });
@@ -423,24 +474,6 @@ public class ClientService {
             channel.shutdownNow();
             Thread.currentThread().interrupt();
         }
-    }
-
-    /** Write chunks to disk using a large write buffer; ByteString.writeTo avoids an extra copy. */
-    private void assembleFile(Map<Integer, ByteString> downloadedChunks, FileManifestEntry manifest) throws IOException {
-        Path outputPath = Path.of("client", manifest.getFilename());
-        Files.createDirectories(outputPath.getParent());
-
-        try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(outputPath), 8 * 1024 * 1024)) {
-            for (int i = 0; i < manifest.getNumChunks(); i++) {
-                ByteString chunk = downloadedChunks.get(i);
-                if (chunk == null) {
-                    throw new IllegalStateException("Missing downloaded chunk " + i);
-                }
-                chunk.writeTo(out);
-            }
-        }
-
-        info("File written to " + outputPath);
     }
 
     private void printSpeedSummary(FileManifestEntry manifest, long startNanos) {
