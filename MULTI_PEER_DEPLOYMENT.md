@@ -4,10 +4,10 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      TRACKER (Central)                       │
-│              (Maintains peer registry)                       │
+│                      TRACKER (Central)                      │
+│              (Maintains peer registry)                      │
 │              Optional: Single machine or HA                 │
-└────────────────┬────────────────┬─────────────────────────┘
+└────────────────┬────────────────┬───────────────────────────┘
                  │                │
                  │ Heartbeat      │ Heartbeat
                  │ (every 5s)     │

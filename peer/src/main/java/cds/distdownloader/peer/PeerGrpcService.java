@@ -26,6 +26,7 @@ import cds.distdownloader.proto.ChunkRequest;
 import cds.distdownloader.proto.ChunkResponse;
 import cds.distdownloader.proto.FileManifestEntry;
 import cds.distdownloader.proto.FileRequest;
+import cds.distdownloader.proto.MultiChunkRequest;
 import cds.distdownloader.proto.HeartbeatRequest;
 import cds.distdownloader.proto.HeartbeatResponse;
 import cds.distdownloader.proto.PeerEndpoint;
@@ -313,7 +314,7 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
     public void getChunk(ChunkRequest request, StreamObserver<ChunkResponse> responseObserver) {
         ChunkRef chunk = request.getChunk();
         String file = chunk.getFileId();
-        Integer index = chunk.getChunkIndex();
+        int index = chunk.getChunkIndex();
         Map<Integer, ByteString> chunkMap = fileToChunk.get(file);
         if (chunkMap == null) {
             responseObserver.onError(Status.NOT_FOUND
@@ -330,11 +331,38 @@ public class PeerGrpcService extends PeerGrpc.PeerImplBase {
             return;
         }
 
-        ChunkResponse resp = ChunkResponse.newBuilder()
+        responseObserver.onNext(ChunkResponse.newBuilder()
                 .setData(chunkBytes)
-                .build();
-        info("Sending");
-        responseObserver.onNext(resp);
+                .setChunkIndex(index)
+                .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getChunks(MultiChunkRequest request, StreamObserver<ChunkResponse> responseObserver) {
+        String file = request.getFileId();
+        Map<Integer, ByteString> chunkMap = fileToChunk.get(file);
+        if (chunkMap == null) {
+            responseObserver.onError(Status.NOT_FOUND
+                    .withDescription("No chunks tracked for file_id=" + file)
+                    .asRuntimeException());
+            return;
+        }
+
+        for (int index : request.getChunkIndicesList()) {
+            ByteString chunkBytes = chunkMap.get(index);
+            if (chunkBytes == null) {
+                responseObserver.onError(Status.NOT_FOUND
+                        .withDescription("Chunk not found for file_id=" + file + ", chunk_index=" + index)
+                        .asRuntimeException());
+                return;
+            }
+            info("Sending chunk " + index);
+            responseObserver.onNext(ChunkResponse.newBuilder()
+                    .setData(chunkBytes)
+                    .setChunkIndex(index)
+                    .build());
+        }
         responseObserver.onCompleted();
     }
 

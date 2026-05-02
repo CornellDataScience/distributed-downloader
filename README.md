@@ -126,7 +126,7 @@ Peers do not copy files to each other proactively. Sharing is pull-based:
 5. The tracker records which peers are alive and which filenames they advertise.
 6. A client asks the tracker for the file manifest, then asks the tracker for live peers.
 7. The client asks each peer for an availability bitmap.
-8. The client downloads each chunk from one of the peers that has it.
+8. The client assigns chunks to peers (least-assigned-so-far) and opens one streaming `GetChunks` RPC per peer. All chunks assigned to a peer arrive over a single HTTP/2 stream rather than one RPC per chunk.
 9. The client assembles the chunks into `client/<filename>`.
 
 So the tracker is only a directory. File bytes move directly from peers to the client over the peer gRPC service.
@@ -183,6 +183,8 @@ Client arguments:
 ```
 
 Note: `manifestPath` is still accepted by the client CLI, but the current download path gets the manifest from the tracker using `filename`.
+
+`maxDownloadParallelism` is accepted for backward compatibility but no longer used. Download concurrency is now one streaming RPC per peer — the client assigns chunks to peers up front and opens one `GetChunks` stream per peer in parallel rather than one RPC per chunk.
 
 ## Troubleshooting
 

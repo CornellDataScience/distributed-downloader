@@ -22,9 +22,16 @@ message ChunkRequest {
 
 message ChunkResponse {
   bytes data = 1;
+  uint32 chunk_index = 2;
+}
+
+message MultiChunkRequest {
+  string file_id = 1;
+  repeated uint32 chunk_indices = 2;
 }
 
 service Peer {
   rpc GetAvailability(FileRequest) returns (ChunkBitmap);
   rpc GetChunk(ChunkRequest) returns (ChunkResponse);
+  rpc GetChunks(MultiChunkRequest) returns (stream ChunkResponse);
 }
