@@ -129,7 +129,8 @@ public class ClientService {
             Map<Integer, List<PeerEndpoint>> chunkToPeer = Collections.synchronizedMap(new HashMap<>());
             collectAvailabilityParallel(fileId, peers, chunkToPeer, availabilityThreads);
 
-            downloadChunks(fileId, manifest, chunkToPeer, downloadThreads);
+            long networkDownloadNanos = downloadChunks(fileId, manifest, chunkToPeer, downloadThreads);
+            printNetworkSpeedSummary(manifest, networkDownloadNanos);
             printSpeedSummary(manifest, startNanos);
         } finally {
             trackerChannel.shutdown();
@@ -207,7 +208,7 @@ public class ClientService {
         }
     }
 
-    private void downloadChunks(
+    private long downloadChunks(
             String fileId,
             FileManifestEntry manifest,
             Map<Integer, List<PeerEndpoint>> chunkToPeer,
@@ -221,6 +222,7 @@ public class ClientService {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
 
         try {
+            long networkStartNanos = System.nanoTime();
             List<Future<?>> futures = new ArrayList<>();
             for (int chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
                 final int idx = chunkIdx;
@@ -244,6 +246,7 @@ public class ClientService {
                     throw new IOException("Parallel download failed", e);
                 }
             }
+            long networkDownloadNanos = System.nanoTime() - networkStartNanos;
 
             if (!missingChunks.isEmpty()) {
                 throw new IllegalStateException("Missing peers for chunks " + missingChunks);
@@ -254,6 +257,7 @@ public class ClientService {
             }
 
             assembleFile(downloadedChunks, manifest);
+            return networkDownloadNanos;
         } finally {
             executor.shutdown();
         }
@@ -350,7 +354,18 @@ public class ClientService {
         double mib = manifest.getFilesize() / (1024.0 * 1024.0);
         double mibPerSecond = elapsedSeconds == 0 ? 0 : mib / elapsedSeconds;
 
-        System.out.printf("Downloaded %.2f MiB in %.2f seconds (%.2f MiB/s)%n",
+        System.out.printf("End-to-end: %.2f MiB in %.2f seconds (%.2f MiB/s)%n",
+                mib,
+                elapsedSeconds,
+                mibPerSecond);
+    }
+
+    private void printNetworkSpeedSummary(FileManifestEntry manifest, long elapsedNanos) {
+        double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
+        double mib = manifest.getFilesize() / (1024.0 * 1024.0);
+        double mibPerSecond = elapsedSeconds == 0 ? 0 : mib / elapsedSeconds;
+
+        System.out.printf("Network/download engine: %.2f MiB in %.2f seconds (%.2f MiB/s)%n",
                 mib,
                 elapsedSeconds,
                 mibPerSecond);
