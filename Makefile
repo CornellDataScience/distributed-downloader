@@ -1,16 +1,25 @@
+TRACKER_HOST ?= 127.0.0.1
+TRACKER_PORT ?= 50051
+PEER_PORT ?= $(or $(PORT),6001)
+ADVERTISE_ADDRESS ?= 127.0.0.1
+SHARE_FILE ?=
+MANIFEST ?= env/manifest.json
+
 .PHONY: tracker peer client proto t p c pr all a
 
 tracker:
-	mvn -pl tracker spring-boot:run
+	mvn -pl proto -am -DskipTests install
+	mvn -pl tracker spring-boot:run -Dspring-boot.run.arguments="--spring.grpc.server.port=$(TRACKER_PORT)"
 
 peer:
-	mvn -pl peer spring-boot:run -Dspring-boot.run.arguments="--peer.port=$(PORT)"
+	mvn -pl proto -am -DskipTests install
+	mvn -pl peer spring-boot:run -Dspring-boot.run.arguments="--peer.port=$(PEER_PORT) --tracker.address=$(TRACKER_HOST) --tracker.port=$(TRACKER_PORT) --peer.advertise-address=$(ADVERTISE_ADDRESS) --peer.share-file=$(SHARE_FILE)"
 
 client:
-	mvn -f client/pom.xml -DskipTests compile exec:java -Dexec.mainClass=cds.distdownloader.client.Client -Dexec.args="$(or $(HOST),127.0.0.1) $(or $(TRACKER_PORT),50051) $(or $(MANIFEST),env/manifest.json) $(FILE)"
+	mvn -f client/pom.xml -DskipTests compile exec:java -Dexec.mainClass=cds.distdownloader.client.Client -Dexec.args="$(TRACKER_HOST) $(TRACKER_PORT) $(MANIFEST) $(FILE)"
 
 proto:
-	mvn -pl proto -am generate-sources
+	mvn -pl proto -am -DskipTests install
 
 t: tracker
 
