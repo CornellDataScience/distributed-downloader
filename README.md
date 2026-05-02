@@ -1,144 +1,212 @@
 # Distributed Downloader
 
-LAN-first peer-to-peer distributed downloader for game/software installs and updates.
+A LAN-first peer-to-peer downloader written in Java, Spring Boot, gRPC, and Protocol Buffers.
 
-When multiple machines on the same LAN need the same file, peers can share chunks locally to reduce origin bandwidth and improve install speed.
+The project has three moving parts:
 
-## Current Architecture (Plan A)
+- `tracker/`: registry service that tracks live peers and the files they advertise
+- `peer/`: gRPC file server that advertises one local file and serves its chunks
+- `client/`: CLI downloader that asks the tracker for metadata and downloads chunks from peers
+- `proto/`: shared protobuf contracts and generated Java gRPC classes
 
-1. **Tracker** (`tracker/`, Spring Boot + gRPC)
-- Tracks peer liveness (`peer_id`, `ip`, `port`, `last_seen`)
-- Tracks which file IDs each peer advertises in memory
-- RPCs: `Heartbeat`, `ListPeers`
+## Requirements
 
-2. **Peer** (`peer/`, Spring Boot + gRPC)
-- Serves chunk availability and chunk bytes
-- RPCs: `GetAvailability(file_id)`, `GetChunk(file_id, chunk_index)`
-- Current implementation is demo-oriented around `Test.bin`
-
-3. **Client** (`client/`, standalone Maven module)
-- Loads manifest
-- Asks tracker for live peers
-- Fetches availability bitmap from peers
-- Downloads chunks in parallel
-- Assembles the downloaded chunks into an output file
-- SHA-256 verification and origin fallback are still planned
-
-## Repo Structure
-
-- `proto/` - Protobuf definitions + generated gRPC Java classes
-- `tracker/` - Tracker service
-- `peer/` - Peer service
-- `client/` - CLI-style client used to download and assemble chunks
-- `env/` - local sample files/notes
-
-## Protobuf Notes
-
-- Protobuf package: `cds.distdownloader.v1`
-- Generated Java package: `cds.distdownloader.proto`
-- Generated classes and stubs come from:
-    - `common.proto`
-    - `tracker.proto`
-    - `peer.proto`
-    - `client.proto`
-
-## Prerequisites
-
-- Java 21
+- Java 21 or newer
 - Maven 3.9+
+
+The current machine is using Java 25 successfully, but the project is configured around Java 21 source compatibility.
 
 ## Build
 
-From repo root, build the reactor modules (`proto`, `tracker`, `peer`):
+From the repo root:
 
 ```bash
+# Build tracker, peer, and proto
+make all
+
+# Regenerate and install the local proto jar
+make pr
+
+# Full Maven build/install
 mvn -DskipTests clean install
 ```
 
-The client is currently built as a separate Maven project:
+`tracker` and `peer` depend on the locally installed `cds.distdownloader:proto` snapshot. The Makefile installs `proto` before starting services so stale generated gRPC classes do not get loaded from `~/.m2`.
+
+## Quick Start
+
+Use separate terminals for tracker, peer, and client.
+
+Terminal 1: start the tracker.
 
 ```bash
-mvn -f client/pom.xml -DskipTests compile
+make t
 ```
 
-Useful module-specific builds:
+Terminal 2: start a peer that shares a file.
 
 ```bash
-# Regenerate + install proto artifact
-mvn -pl proto -am clean install -DskipTests
-
-# Compile peer with reactor dependencies
-mvn -pl peer -am clean compile
-
-# Compile tracker with reactor dependencies
-mvn -pl tracker -am clean compile
-
-# Compile client
-mvn -f client/pom.xml -DskipTests compile
+make peer PEER_PORT=7003 SHARE_FILE=peer/Test1mb.bin
 ```
 
-## Run Services
-
-From repo root:
+Terminal 3: download that file through the client.
 
 ```bash
-# Run tracker
-mvn -pl tracker spring-boot:run
-
-# Run peer
-mvn -pl peer spring-boot:run
+make c FILE=Test1mb.bin
 ```
 
-Also at repo root, leverage MakeFile:
+The output file is written to:
+
+```text
+client/Test1mb.bin
+```
+
+## Common Commands
 
 ```bash
-# Run tracker
+# Start tracker on the default port, 50051
 make t
 
-# Run peer
-make peer PORT=7003
+# Start tracker on another port
+make t TRACKER_PORT=50052
 
-# Run client
-make c
+# Start a peer on the default peer port, 6001
+make peer SHARE_FILE=peer/Test1mb.bin
 
-# Recompile proto files
-make pr
+# Start a peer on a specific port
+make peer PEER_PORT=7003 SHARE_FILE=peer/Test1mb.bin
+
+# Backward-compatible alias for peer port
+make peer PORT=7003 SHARE_FILE=peer/Test1mb.bin
+
+# Start a peer that connects to a non-default tracker
+make peer PEER_PORT=7004 TRACKER_HOST=127.0.0.1 TRACKER_PORT=50051 SHARE_FILE=peer/Test100mb.bin
+
+# Start a peer on another LAN machine
+make peer PEER_PORT=7003 \
+  TRACKER_HOST=<tracker-ip> \
+  TRACKER_PORT=50051 \
+  ADVERTISE_ADDRESS=<this-peer-lan-ip> \
+  SHARE_FILE=/absolute/path/to/file.bin
+
+# Download a file advertised by peers
+make c FILE=Test1mb.bin
+
+# Download through a tracker on another host
+make c TRACKER_HOST=<tracker-ip> TRACKER_PORT=50051 FILE=file.bin
 ```
 
-Run with different IP addresses
+Equivalent Maven commands:
 
-Laptop A (tracker):
 ```bash
-# Find IP address
+# Tracker
+mvn -pl proto -am -DskipTests install
+mvn -pl tracker spring-boot:run \
+  -Dspring-boot.run.arguments="--spring.grpc.server.port=50051"
+
+# Peer
+mvn -pl proto -am -DskipTests install
+mvn -pl peer spring-boot:run \
+  -Dspring-boot.run.arguments="--peer.port=7003 --tracker.address=127.0.0.1 --tracker.port=50051 --peer.advertise-address=127.0.0.1 --peer.share-file=peer/Test1mb.bin"
+
+# Client
+mvn -f client/pom.xml -DskipTests compile exec:java \
+  -Dexec.mainClass=cds.distdownloader.client.Client \
+  -Dexec.args="127.0.0.1 50051 env/manifest.json Test1mb.bin"
+```
+
+## How Peers Share
+
+Peers do not copy files to each other proactively. Sharing is pull-based:
+
+1. A peer starts with `SHARE_FILE=/path/to/file`.
+2. The peer reads that file, splits it into 1 MiB chunks, and stores those chunks in memory.
+3. Every 5 seconds, the peer sends a heartbeat to the tracker.
+4. The heartbeat includes the peer endpoint plus a manifest entry for the shared file.
+5. The tracker records which peers are alive and which filenames they advertise.
+6. A client asks the tracker for the file manifest, then asks the tracker for live peers.
+7. The client asks each peer for an availability bitmap.
+8. The client downloads each chunk from one of the peers that has it.
+9. The client assembles the chunks into `client/<filename>`.
+
+So the tracker is only a directory. File bytes move directly from peers to the client over the peer gRPC service.
+
+Currently, each peer seeds the entire file named by `SHARE_FILE`. If several peers share the same filename, the client can query all of them and distribute chunk requests across the available owners. The old randomized partial-chunk demo code is still present but commented out.
+
+## LAN Setup
+
+On the tracker machine:
+
+```bash
 ipconfig getifaddr en0
-
-# Start tracker
-mvn -pl tracker spring-boot:run -Dspring-boot.run.arguments="--spring.grpc.server.port=<trackerPort>"
+make t TRACKER_PORT=50051
 ```
 
-Laptop B (peer):
+On each peer machine:
+
 ```bash
-# Verify connectivity
-grpcurl -plaintext <trackerAddress>:<trackerPort> list
-
-# Point peer to tracker IP
-mvn -pl peer spring-boot:run -Dspring-boot.run.arguments="--spring.grpc.server.port=<peerPort> --tracker.address=<trackerAddress> --tracker.port=<trackerPort>"
+ipconfig getifaddr en0
+make peer \
+  PEER_PORT=7003 \
+  TRACKER_HOST=<tracker-ip> \
+  TRACKER_PORT=50051 \
+  ADVERTISE_ADDRESS=<peer-ip> \
+  SHARE_FILE=/absolute/path/to/shared-file.bin
 ```
 
-## Generated gRPC Output
+On the client machine:
 
-After building `proto`:
+```bash
+make c TRACKER_HOST=<tracker-ip> TRACKER_PORT=50051 FILE=shared-file.bin
+```
 
-- Java protobuf classes: `proto/target/generated-sources/protobuf/java`
-- gRPC stubs: `proto/target/generated-sources/protobuf/grpc-java`
+The filename passed to `FILE` must match the basename of the peer's `SHARE_FILE`. For example, `SHARE_FILE=/tmp/game.zip` is requested with `FILE=game.zip`.
 
-## Current MVP Status
+## Configuration
 
-- Proto contracts are defined for Tracker and Peer services
-- Tracker stores live peer endpoints and advertised file IDs in memory
-- Peer serves demo chunk availability and chunk bytes for `Test.bin`
-- Client can query peers, download advertised chunks in parallel, and assemble the file
-- Hash verification, origin fallback, persistent storage, and general file indexing are not implemented yet
+Tracker:
+
+- `spring.grpc.server.port`: tracker gRPC port, default `50051`
+
+Peer:
+
+- `peer.port`: peer gRPC server port, default `6001`
+- `tracker.address`: tracker host, default `localhost`
+- `tracker.port`: tracker port, default `50051`
+- `peer.advertise-address`: address that clients should use to reach this peer, default `127.0.0.1`
+- `peer.share-file`: file this peer advertises and serves
+
+Client arguments:
+
+```text
+[trackerHost] [trackerPort] [manifestPath] [filename] [maxAvailabilityParallelism] [maxDownloadParallelism]
+```
+
+Note: `manifestPath` is still accepted by the client CLI, but the current download path gets the manifest from the tracker using `filename`.
+
+## Troubleshooting
+
+If you see `NoSuchMethodError` for `getFilesList` or `addAllFiles`, restart every running tracker and peer JVM after `make pr`. Old Spring Boot processes keep old classes loaded until they exit.
+
+```bash
+make pr
+# Ctrl-C old tracker and peer terminals
+make t
+make peer PEER_PORT=7003 SHARE_FILE=peer/Test1mb.bin
+```
+
+If a peer starts but the client cannot download anything, check that the peer was started with `SHARE_FILE` and that the client `FILE` value is the same filename.
+
+If you run across multiple machines, set `ADVERTISE_ADDRESS` to the peer's LAN IP. Leaving it as `127.0.0.1` makes remote clients try to connect to themselves.
+
+## Current Limitations
+
+- Tracker state is in memory only.
+- Peers load the shared file chunks into memory.
+- Hash verification is not enforced by the client yet.
+- Origin fallback is not implemented.
+- Client output always goes to `client/<filename>`.
+- The tracker returns all live peers; the client filters by asking each peer for availability.
 
 ## Team
 
