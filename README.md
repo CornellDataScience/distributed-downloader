@@ -1,7 +1,7 @@
 
 # Distributed Downloader
 
-A LAN-first peer-to-peer file downloader built for Cornell's CS 4410 / CDS course project. Written in Java with Spring Boot, gRPC, and Protocol Buffers.
+A LAN-first peer-to-peer file downloader written in Java with Spring Boot, gRPC, and Protocol Buffers.
 
 **[Final Presentation Slides](CDS%20Distributed%20Downloader.pdf)**
 
