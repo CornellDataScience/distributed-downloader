@@ -1,26 +1,39 @@
 
-
 # Distributed Downloader
 
-A LAN-first peer-to-peer downloader written in Java, Spring Boot, gRPC, and Protocol Buffers.
+A LAN-first peer-to-peer file downloader built for Cornell's CS 4410 / CDS course project. Written in Java with Spring Boot, gRPC, and Protocol Buffers.
 
-The project has three moving parts:
+**[Final Presentation Slides](CDS%20Distributed%20Downloader.pdf)**
+
+## Architecture
+
+The project has four components:
 
 - `tracker/`: registry service that tracks live peers and the files they advertise
 - `peer/`: gRPC file server that advertises one local file and serves its chunks
-- `client/`: CLI downloader that asks the tracker for metadata and downloads chunks from peers
-- `proto/`: shared protobuf contracts and generated Java gRPC classes
+- `client/`: CLI downloader that queries the tracker for metadata and pulls chunks from peers in parallel
+- `proto/`: shared Protobuf contracts and generated Java gRPC stubs
+
+File bytes never flow through the tracker. The tracker is a directory only — chunks move directly from peers to the client over peer gRPC streams.
+
+## How It Works
+
+1. A peer starts up with `SHARE_FILE=/path/to/file`, splits the file into 1 MiB chunks, and holds them in memory.
+2. Every 5 seconds the peer sends a heartbeat to the tracker advertising its endpoint and filename.
+3. The tracker records which peers are alive and what they serve.
+4. A client asks the tracker for the file manifest and a list of live peers.
+5. The client queries each peer for a chunk availability bitmap.
+6. The client assigns chunks across peers (least-assigned-first) and opens one streaming `GetChunks` RPC per peer. All chunks for a given peer arrive over a single HTTP/2 stream.
+7. The client reassembles chunks and writes the output to `client/<filename>`.
+
+Multiple peers can share the same filename. The client distributes chunk requests across all available owners.
 
 ## Requirements
 
-- Java 21 or newer
+- Java 21 or newer (tested on Java 25)
 - Maven 3.9+
 
-The current machine is using Java 25 successfully, but the project is configured around Java 21 source compatibility.
-
 ## Build
-
-From the repo root:
 
 ```bash
 # Build tracker, peer, and proto
@@ -33,46 +46,42 @@ make pr
 mvn -DskipTests clean install
 ```
 
-`tracker` and `peer` depend on the locally installed `cds.distdownloader:proto` snapshot. The Makefile installs `proto` before starting services so stale generated gRPC classes do not get loaded from `~/.m2`.
+`tracker` and `peer` depend on the locally installed `cds.distdownloader:proto` snapshot. The Makefile installs `proto` before starting services to prevent stale gRPC classes from being loaded out of `~/.m2`.
 
 ## Quick Start
 
-Use separate terminals for tracker, peer, and client.
+Open three terminals.
 
-Terminal 1: start the tracker.
+**Terminal 1 — tracker:**
 
 ```bash
 make t
 ```
 
-Terminal 2: start a peer that shares a file.
+**Terminal 2 — peer:**
 
 ```bash
 make peer PEER_PORT=7003 SHARE_FILE=peer/Test1mb.bin
 ```
 
-Terminal 3: download that file through the client.
+**Terminal 3 — client:**
 
 ```bash
 make c FILE=Test1mb.bin
 ```
 
-The output file is written to:
-
-```text
-client/Test1mb.bin
-```
+The downloaded file is written to `client/Test1mb.bin`.
 
 ## Common Commands
 
 ```bash
-# Start tracker on the default port, 50051
+# Start tracker on the default port (50051)
 make t
 
-# Start tracker on another port
+# Start tracker on a custom port
 make t TRACKER_PORT=50052
 
-# Start a peer on the default peer port, 6001
+# Start a peer on the default peer port (6001)
 make peer SHARE_FILE=peer/Test1mb.bin
 
 # Start a peer on a specific port
@@ -81,17 +90,17 @@ make peer PEER_PORT=7003 SHARE_FILE=peer/Test1mb.bin
 # Backward-compatible alias for peer port
 make peer PORT=7003 SHARE_FILE=peer/Test1mb.bin
 
-# Start a peer that connects to a non-default tracker
+# Start a peer pointing at a non-default tracker
 make peer PEER_PORT=7004 TRACKER_HOST=127.0.0.1 TRACKER_PORT=50051 SHARE_FILE=peer/Test100mb.bin
 
-# Start a peer on another LAN machine
+# Start a peer on a remote LAN machine
 make peer PEER_PORT=7003 \
   TRACKER_HOST=<tracker-ip> \
   TRACKER_PORT=50051 \
   ADVERTISE_ADDRESS=<this-peer-lan-ip> \
   SHARE_FILE=/absolute/path/to/file.bin
 
-# Download a file advertised by peers
+# Download a file from peers
 make c FILE=Test1mb.bin
 
 # Download through a tracker on another host
@@ -117,23 +126,25 @@ mvn -f client/pom.xml -DskipTests compile exec:java \
   -Dexec.args="127.0.0.1 50051 env/manifest.json Test1mb.bin"
 ```
 
-## How Peers Share
+## Hosted Tracker
 
-Peers do not copy files to each other proactively. Sharing is pull-based:
+A tracker is running on Cornell's eduroam network. Connect to eduroam, then use this IP for any `TRACKER_HOST` argument:
 
-1. A peer starts with `SHARE_FILE=/path/to/file`.
-2. The peer reads that file, splits it into 1 MiB chunks, and stores those chunks in memory.
-3. Every 5 seconds, the peer sends a heartbeat to the tracker.
-4. The heartbeat includes the peer endpoint plus a manifest entry for the shared file.
-5. The tracker records which peers are alive and which filenames they advertise.
-6. A client asks the tracker for the file manifest, then asks the tracker for live peers.
-7. The client asks each peer for an availability bitmap.
-8. The client assigns chunks to peers (least-assigned-so-far) and opens one streaming `GetChunks` RPC per peer. All chunks assigned to a peer arrive over a single HTTP/2 stream rather than one RPC per chunk.
-9. The client assembles the chunks into `client/<filename>`.
+```
+10.49.14.104
+```
 
-So the tracker is only a directory. File bytes move directly from peers to the client over the peer gRPC service.
+Example — download a file from the hosted tracker:
 
-Currently, each peer seeds the entire file named by `SHARE_FILE`. If several peers share the same filename, the client can query all of them and distribute chunk requests across the available owners. The old randomized partial-chunk demo code is still present but commented out.
+```bash
+make c TRACKER_HOST=10.49.14.104 TRACKER_PORT=50051 FILE=yourfile.bin
+```
+
+Example — register a peer with the hosted tracker:
+
+```bash
+make peer PEER_PORT=7003 TRACKER_HOST=10.49.14.104 TRACKER_PORT=50051 ADVERTISE_ADDRESS=<your-eduroam-ip> SHARE_FILE=/path/to/file.bin
+```
 
 ## LAN Setup
 
@@ -153,71 +164,74 @@ make peer \
   TRACKER_HOST=<tracker-ip> \
   TRACKER_PORT=50051 \
   ADVERTISE_ADDRESS=<peer-ip> \
-  SHARE_FILE=/absolute/path/to/shared-file.bin
+  SHARE_FILE=/absolute/path/to/file.bin
 ```
 
 On the client machine:
 
 ```bash
-make c TRACKER_HOST=<tracker-ip> TRACKER_PORT=50051 FILE=shared-file.bin
+make c TRACKER_HOST=<tracker-ip> TRACKER_PORT=50051 FILE=file.bin
 ```
 
-The filename passed to `FILE` must match the basename of the peer's `SHARE_FILE`. For example, `SHARE_FILE=/tmp/game.zip` is requested with `FILE=game.zip`.
+The `FILE` value must match the basename of the peer's `SHARE_FILE`. For example, `SHARE_FILE=/tmp/game.zip` is requested with `FILE=game.zip`.
 
 ## Configuration
 
-Tracker:
+**Tracker:**
 
-- `spring.grpc.server.port`: tracker gRPC port, default `50051`
+| Property | Default | Description |
+|---|---|---|
+| `spring.grpc.server.port` | `50051` | Tracker gRPC port |
 
-Peer:
+**Peer:**
 
-- `peer.port`: peer gRPC server port, default `6001`
-- `tracker.address`: tracker host, default `localhost`
-- `tracker.port`: tracker port, default `50051`
-- `peer.advertise-address`: address that clients should use to reach this peer, default `127.0.0.1`
-- `peer.share-file`: file this peer advertises and serves
+| Property | Default | Description |
+|---|---|---|
+| `peer.port` | `6001` | Peer gRPC server port |
+| `tracker.address` | `localhost` | Tracker host |
+| `tracker.port` | `50051` | Tracker port |
+| `peer.advertise-address` | `127.0.0.1` | Address clients use to reach this peer |
+| `peer.share-file` | — | File this peer advertises and serves |
 
-Client arguments:
+**Client arguments:**
 
 ```text
 [trackerHost] [trackerPort] [manifestPath] [filename] [maxAvailabilityParallelism] [maxDownloadParallelism]
 ```
 
-Note: `manifestPath` is still accepted by the client CLI, but the current download path gets the manifest from the tracker using `filename`.
-
-`maxDownloadParallelism` is accepted for backward compatibility but no longer used. Download concurrency is now one streaming RPC per peer — the client assigns chunks to peers up front and opens one `GetChunks` stream per peer in parallel rather than one RPC per chunk.
+`manifestPath` is accepted but ignored — the manifest is fetched live from the tracker using `filename`. `maxDownloadParallelism` is accepted for backward compatibility but no longer used; concurrency is now one streaming RPC per peer.
 
 ## Troubleshooting
 
-If you see `NoSuchMethodError` for `getFilesList` or `addAllFiles`, restart every running tracker and peer JVM after `make pr`. Old Spring Boot processes keep old classes loaded until they exit.
+**`NoSuchMethodError` for `getFilesList` or `addAllFiles`:** Restart all tracker and peer JVMs after `make pr`. Old processes keep stale classes loaded until they exit.
 
 ```bash
 make pr
-# Ctrl-C old tracker and peer terminals
+# Ctrl-C all tracker and peer terminals, then:
 make t
 make peer PEER_PORT=7003 SHARE_FILE=peer/Test1mb.bin
 ```
 
-If a peer starts but the client cannot download anything, check that the peer was started with `SHARE_FILE` and that the client `FILE` value is the same filename.
+**Client connects but downloads nothing:** Confirm the peer was started with `SHARE_FILE` and that the `FILE` argument matches the basename exactly.
 
-If you run across multiple machines, set `ADVERTISE_ADDRESS` to the peer's LAN IP. Leaving it as `127.0.0.1` makes remote clients try to connect to themselves.
+**Remote peers unreachable:** Set `ADVERTISE_ADDRESS` to the peer's LAN IP. Leaving it as `127.0.0.1` causes remote clients to try connecting to themselves.
 
 ## Current Limitations
 
-- Tracker state is in memory only.
-- Peers load the shared file chunks into memory.
-- Hash verification is not enforced by the client yet.
-- Origin fallback is not implemented.
-- Client output always goes to `client/<filename>`.
-- The tracker returns all live peers; the client filters by asking each peer for availability.
+- Tracker state is held in memory and is lost on restart.
+- Peers load the entire shared file into memory at startup.
+- Chunk hash verification is not enforced client-side.
+- No origin fallback if all peers serving a chunk go offline mid-download.
+- Client output is always written to `client/<filename>`.
 
 ## Team
 
-- Naijei Jiang*
-- Harshaan Chugh*
-- Tanvi Bhave
-- Sabrina Ning
-- Skai Nzeuton
-- Rahi Dasgupta
-- Yitbrek Mata
+| Name | Role |
+|---|---|
+| Naijei Jiang | Tech Lead |
+| Harshaan Chugh | Project Lead |
+| Tanvi Bhave | Engineer |
+| Sabrina Ning | Engineer |
+| Skai Nzeuton | Engineer |
+| Rahi Dasgupta | Engineer |
+| Yitbrek Mata | Engineer |
